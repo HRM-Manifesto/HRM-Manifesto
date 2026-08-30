@@ -1,6 +1,6 @@
-# HRM Forum Steward v2
+# HRM Forum Steward v2.1 — Email Approval
 
-HRM Forum Steward v2 pomaga Aleksandrowi bezpiecznie obsługiwać GitHub Discussions. Analiza i publikacja są rozdzielone na dwa osobne workflow.
+HRM Forum Steward v2.1 pomaga Aleksandrowi bezpiecznie obsługiwać GitHub Discussions. Analiza, zatwierdzenie e-mail i publikacja są rozdzielone. Istniejący ręczny workflow publikacyjny pozostaje jako awaryjny fallback.
 
 Najważniejsza zasada: pojawienie się wpisu lub komentarza **nigdy nie publikuje odpowiedzi automatycznie**.
 
@@ -28,11 +28,42 @@ Analiza trafia do Job Summary, artefaktu Markdown przechowywanego przez 7 dni or
 
 ## Email notifications
 
-Po udanej analizie wysyłany jest e-mail plain text. Niezaufany HTML z forum nie jest renderowany.
+Po udanej analizie wysyłany jest e-mail w bezpiecznej wersji tekstowej i prostej wersji HTML. Wszystkie fragmenty pochodzące z forum są kodowane; niezaufany HTML nie jest renderowany.
 
 Odbiorca pochodzi wyłącznie z repository variable `HRM_NOTIFY_EMAIL`. Treść wpisu nie może zmienić odbiorcy, hosta SMTP, modelu ani uprawnień.
 
-E-mail zawiera target publikacji. Dla komentarza jest to GitHub GraphQL node ID, który pozwala zachować kontekst. Dla Discussion można też użyć jego numeru albo pełnego URL.
+Każdy e-mail otrzymuje kryptograficznie losowy, jednorazowy Approval ID o entropii 256 bitów. Pełne ID jest obecne wyłącznie w prywatnym e-mailu i podpisanym rekordzie IMAP. Job Summary, artefakt i komentarz GitHub nie pokazują pełnego ID.
+
+Rekord oczekującej sprawy jest podpisany HMAC przy użyciu sekretu `HRM_APPROVAL_SECRET`. Zawiera repozytorium, oryginalny target, dokładną polską propozycję oraz datę wygaśnięcia. Dzięki temu treść decyzji e-mail nie może podmienić targetu, repozytorium ani odpowiedzi zapisanej przez Stewarda.
+
+## Obsługa dla Aleksandra
+
+1. Dostajesz e-mail z tematem `[HRM Forum] Review required — ...`.
+2. Czytasz oryginał, pełne tłumaczenie i propozycję po polsku.
+3. Wybierasz jedną decyzję:
+   - klikasz **ZATWIERDŹ**, a następnie naciskasz **Wyślij** w przygotowanej wiadomości;
+   - klikasz **NIE ODPOWIADAJ**, a następnie naciskasz **Wyślij**;
+   - tworzysz wiadomość `HRM EDIT ...` i umieszczasz poprawioną odpowiedź między znacznikami.
+4. Samo kliknięcie linku `mailto:` niczego nie publikuje.
+5. Procesor IMAP wykonuje resztę po otrzymaniu prawidłowej wiadomości.
+
+Dokładne komendy są deterministyczne: `ZATWIERDZAM`, `NIE ODPOWIADAJ` albo `POPRAWIAM` z blokiem `---ODPOWIEDŹ---` / `---KONIEC---`. Model nigdy nie decyduje, czy wiadomość jest zgodą.
+
+## HRM Email Approval Processor
+
+Workflow `.github/workflows/hrm-email-approval.yml` uruchamia się ręcznie albo co 5 minut. Łączy się z IMAP przez bezpośrednie SSL/TLS, odczytuje wyłącznie kandydatów HRM z ostatnich 15 dni i przyjmuje decyzję tylko wtedy, gdy jednocześnie:
+
+- Approval ID ma prawidłowy format;
+- istnieje podpisany rekord oczekującej sprawy;
+- podpis HMAC jest prawidłowy;
+- rekord dotyczy tego repozytorium;
+- ID nie wygasło (domyślnie 14 dni);
+- `From` jest dokładnie zgodny z `HRM_NOTIFY_EMAIL`;
+- komenda ma dokładny dozwolony format.
+
+Po przetworzeniu wiadomości są przenoszone do `HRM/Processed` albo `HRM/Rejected`. Nieprawidłowe kandydaty trafiają do `HRM/Invalid`, a decyzje zakończone bez publikacji wskutek błędu do `HRM/Failed`. Brakujące foldery są tworzone automatycznie. Sprawy z `HRM/Failed` nie są automatycznie ponawiane co 5 minut; wymagają ręcznego sprawdzenia i ewentualnie awaryjnego workflow.
+
+Przed publikacją procesor sprawdza nieodwracalny marker SHA-256 Approval ID w komentarzach Discussion. Chroni to przed ponowną publikacją po restarcie lub błędzie sieciowym. Pełne Approval ID nie trafia do komentarza.
 
 ## Manual approval
 
@@ -73,13 +104,26 @@ Implementacja korzysta z oficjalnego [GitHub Discussions GraphQL API](https://do
 W **Settings → Secrets and variables → Actions → Secrets** dodaj:
 
 - `OPENAI_API_KEY` — istniejący klucz OpenAI API;
+- `HRM_APPROVAL_SECRET` — nowy losowy sekret co najmniej 32-znakowy, używany wyłącznie do podpisywania rekordów zatwierdzeń;
 - `SMTP_HOST` — sama nazwa hosta poczty wychodzącej, bez `https://`, portu i ścieżki;
 - `SMTP_PORT` — port SMTP podany przez operatora skrzynki;
 - `SMTP_USERNAME` — login dokładnie z ustawień skrzynki;
 - `SMTP_PASSWORD` — hasło skrzynki albo hasło aplikacyjne wymagane przez operatora;
 - `SMTP_FROM` — zatwierdzony nadawca, np. `HRM Forum <adres-skrzynki@example.com>`.
+- `IMAP_HOST` — sama nazwa hosta IMAP, bez protokołu, portu i ścieżki;
+- `IMAP_PORT` — port bezpośredniego IMAP SSL/TLS podany przez operatora;
+- `IMAP_USERNAME` — login IMAP;
+- `IMAP_PASSWORD` — hasło skrzynki albo hasło aplikacyjne.
 
 Sekrety nie są zapisywane w repozytorium, e-mailu, artefakcie ani Job Summary. Dane SMTP nie są wysyłane do OpenAI.
+
+`HRM_APPROVAL_SECRET` powinien być niezależny od haseł SMTP i IMAP. Wygeneruj go lokalnie poleceniem:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Skopiuj wynik bezpośrednio do GitHub Secret i usuń go z historii schowka/terminala, jeśli używane narzędzie ją zapisuje. Zmiana tego sekretu unieważni wszystkie oczekujące zatwierdzenia.
 
 ## Required Repository Variables
 
@@ -108,7 +152,20 @@ Nie zgaduj hosta ani portu. Odczytaj je z panelu operatora skrzynki, instrukcji 
 9. Ustaw odbiorcę jako `HRM_NOTIFY_EMAIL` w Variables.
 10. Nie wklejaj tych wartości do Discussion, logów, repozytorium ani zgłoszeń pomocy.
 
-`nodemailer` jest przypięty do dokładnej wersji w `package.json` i `package-lock.json`. Połączenia wymagają TLS 1.2 lub nowszego oraz poprawnego certyfikatu.
+`nodemailer` `9.0.6`, `imapflow` `1.7.6` i `mailparser` `3.9.17` są przypięte do dokładnych wersji w `package.json` i `package-lock.json`. Połączenia wymagają TLS 1.2 lub nowszego oraz poprawnego certyfikatu.
+
+## IMAP configuration — krok po kroku
+
+Nie zgaduj parametrów Loopia. Pobierz je z panelu konkretnej skrzynki lub instrukcji operatora.
+
+1. Znajdź ustawienia poczty przychodzącej IMAP dla `manifest@hrm.se`.
+2. Wybierz parametry bezpośredniego IMAP SSL/TLS, nie POP3.
+3. Skopiuj sam host do `IMAP_HOST`.
+4. Skopiuj port SSL/TLS do `IMAP_PORT`.
+5. Skopiuj login do `IMAP_USERNAME`.
+6. Ustaw hasło lub hasło aplikacyjne jako `IMAP_PASSWORD`.
+7. Nie używaj danych SMTP jako IMAP, dopóki operator nie potwierdzi, że są takie same.
+8. Procesor wymaga TLS 1.2+, poprawnego certyfikatu i nie zezwala na połączenie nieszyfrowane.
 
 ## Pierwszy test e-mail
 
@@ -121,6 +178,19 @@ Po przyszłym wdrożeniu:
 5. sprawdź e-mail: oryginał, tłumaczenie, polską propozycję i target;
 6. sprawdź Job Summary — ma potwierdzić e-mail i brak publikacji;
 7. przy błędzie ponownie porównaj ustawienia skrzynki, ale nie drukuj sekretów.
+
+## Pierwszy bezpieczny test zatwierdzenia e-mail
+
+1. Pozostaw `HRM_EMAIL_ENABLED=false`, dopóki wszystkie nowe sekrety IMAP i `HRM_APPROVAL_SECRET` nie są gotowe.
+2. Utwórz osobną, jawną Discussion testową.
+3. Ustaw `HRM_EMAIL_ENABLED=true` i uruchom ręczny test analizy dla tej Discussion albo dodaj testowy wpis.
+4. Sprawdź, że e-mail zawiera właściwy link, target i polską propozycję.
+5. Najpierw wybierz **NIE ODPOWIADAJ**, wyślij przygotowaną wiadomość i ręcznie uruchom `HRM Email Approval Processor`.
+6. Potwierdź brak komentarza oraz przeniesienie sprawy do `HRM/Rejected`.
+7. Utwórz drugą Discussion testową i powtórz analizę.
+8. Kliknij **ZATWIERDŹ**, ale przed wysłaniem jeszcze raz sprawdź temat i treść. Dopiero potem naciśnij **Wyślij**.
+9. Ręcznie uruchom procesor i sprawdź e-mail potwierdzający oraz link do jednego opublikowanego komentarza.
+10. Ponownie wyślij tę samą decyzję i potwierdź, że drugi komentarz nie powstał.
 
 ## Pierwszy test ręcznej publikacji
 
@@ -142,12 +212,16 @@ Ten test tworzy publiczny komentarz. Wykonaj go wyłącznie w specjalnej Discuss
 - Analiza nie ma prawa zapisu do Discussions.
 - Publikacja nie ma triggera automatycznego.
 - Target musi należeć do `GITHUB_REPOSITORY`.
+- From sam w sobie nie jest autoryzacją; wymagane są także tajne Approval ID i prawidłowy podpis rekordu.
+- Decyzje są parsowane deterministycznie bez użycia modelu.
+- Approval ID wygasa po 14 dniach i jest jednorazowe.
+- Podpisany rekord, a nie tekst decyzji, ustala target i zapisaną propozycję.
 - E-mail jest plain text, a Job Summary neutralizuje Markdown i HTML.
 - Nie ma funkcji usuwania, zamykania, blokowania, zmiany kategorii ani edycji HRM.
 - GitHub Actions są przypięte do pełnych SHA.
 - OpenAI Responses API używa Structured Outputs oraz `store: false`, zgodnie z [OpenAI API Reference](https://developers.openai.com/api/reference/cli/resources/responses/methods/create).
 
-Limity: wpis 8 000 znaków, źródła 12 000 znaków i 6 fragmentów, zatwierdzona odpowiedź 8 000 znaków, najwyżej jedno OpenAI dla analizy i jedno dla niepolskiego publikowania, zero OpenAI przy publikowaniu do polskiego wpisu, job 5 minut.
+Limity: wpis 8 000 znaków, źródła 12 000 znaków i 6 fragmentów, zatwierdzona odpowiedź 8 000 znaków, wiadomość IMAP 256 000 bajtów, najwyżej jedno OpenAI dla analizy i jedno dla niepolskiego publikowania, zero OpenAI przy publikowaniu do polskiego wpisu.
 
 ## How to disable analysis
 
@@ -161,11 +235,25 @@ Ustaw repository variable `HRM_EMAIL_ENABLED` na `false`. Analiza pozostanie akt
 
 Otwórz **Actions → HRM Publish Approved Reply**, wybierz menu i kliknij **Disable workflow**. Wyłączenie analizy nie wyłącza publikowania ręcznego.
 
+## How to stop the email processor
+
+Otwórz **Actions → HRM Email Approval Processor**, wybierz menu i kliknij **Disable workflow**. Zatrzymuje to harmonogram i ręczne przetwarzanie IMAP, ale nie usuwa oczekujących wiadomości. Awaryjny `HRM Publish Approved Reply` pozostaje dostępny osobno.
+
+## Troubleshooting
+
+- **Brak e-maila analizy:** sprawdź `HRM_EMAIL_ENABLED`, SMTP Secrets i Job Summary. Nie drukuj wartości sekretów.
+- **Procesor nie łączy się:** porównaj host, port SSL/TLS, login i hasło z instrukcją IMAP operatora. Nie używaj POP3.
+- **Decyzja jest nieprawidłowa:** sprawdź dokładny temat, pełne Approval ID, adres From i dokładną treść komendy.
+- **Approval wygasł:** wykonaj nową analizę, aby otrzymać nowe powiadomienie.
+- **Publikacja nie nastąpiła:** sprawdź Job Summary procesora. Przy błędzie GitHub lub tłumaczenia wiadomości pozostają nieoznaczone jako successful.
+- **E-mail potwierdzający nie dotarł:** publikacja może już istnieć; sprawdź Discussion i Job Summary przed ponowną próbą.
+- **Awaryjna publikacja:** użyj istniejącego `HRM Publish Approved Reply` dopiero po ręcznej weryfikacji targetu i polskiej treści.
+
 ## Emergency stop
 
-1. Wyłącz oba workflow w Actions.
+1. Wyłącz trzy workflow w Actions: analizę, procesor e-mail i awaryjną publikację.
 2. W **Settings → Actions → General** możesz wyłączyć wszystkie Actions.
-3. Przy podejrzeniu ujawnienia zmień `OPENAI_API_KEY` i `SMTP_PASSWORD` u dostawców, a następnie zaktualizuj GitHub Secrets.
+3. Przy podejrzeniu ujawnienia zmień odpowiednie hasła, `OPENAI_API_KEY` i `HRM_APPROVAL_SECRET`, a następnie zaktualizuj GitHub Secrets.
 4. Ustaw `HRM_EMAIL_ENABLED=false`.
 5. Nie usuwaj wpisów forum automatycznie; najpierw wykonaj ręczny audyt.
 

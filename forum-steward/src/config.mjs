@@ -8,6 +8,9 @@ export const MAX_APPROVED_REPLY_CHARS = 8_000;
 export const MAX_TARGET_CHARS = 250;
 export const MIN_TRANSLATION_CONFIDENCE = 0.9;
 export const REQUEST_TIMEOUT_MS = 45_000;
+export const APPROVAL_TTL_MS = 14 * 24 * 60 * 60 * 1_000;
+export const MAX_EMAIL_SOURCE_BYTES = 256_000;
+export const IMAP_LOOKBACK_DAYS = 15;
 
 export const ENTRY_TYPES = [
   "question",

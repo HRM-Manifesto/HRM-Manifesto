@@ -223,3 +223,85 @@ export async function publishDiscussionReply({ resolvedTarget, body, token, fetc
   if (!comment?.id || !comment?.url) throw new Error("GitHub did not confirm publication");
   return { id: comment.id, url: comment.url };
 }
+
+const MARKER_SCAN_QUERY = `query FindApprovalMarker($discussionId: ID!, $after: String) {
+  node(id: $discussionId) {
+    ... on Discussion {
+      comments(first: 100, after: $after) {
+        nodes {
+          id
+          body
+          url
+          replies(first: 100) {
+            nodes { body url }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+
+const REPLY_MARKER_SCAN_QUERY = `query FindApprovalMarkerInReplies($commentId: ID!, $after: String) {
+  node(id: $commentId) {
+    ... on DiscussionComment {
+      replies(first: 100, after: $after) {
+        nodes { body url }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+
+function markerHit(nodes, marker) {
+  const hit = (nodes ?? []).find((node) => typeof node.body === "string" && node.body.includes(marker));
+  return hit ? { found: true, url: hit.url } : null;
+}
+
+async function scanRemainingReplies({ comment, marker, token, fetchImpl }) {
+  let pageInfo = comment.replies?.pageInfo;
+  let pages = 0;
+  while (pageInfo?.hasNextPage) {
+    if (pages++ >= 100) throw new Error("GitHub reply history exceeds the idempotency scan limit");
+    const data = await githubGraphql({
+      token,
+      query: REPLY_MARKER_SCAN_QUERY,
+      variables: { commentId: comment.id, after: pageInfo.endCursor },
+      fetchImpl,
+    });
+    const replies = data?.node?.replies;
+    const hit = markerHit(replies?.nodes, marker);
+    if (hit) return hit;
+    pageInfo = replies?.pageInfo;
+  }
+  return null;
+}
+
+export async function findApprovalMarker({ discussionId, marker, token, fetchImpl = globalThis.fetch }) {
+  if (!/^[A-Za-z0-9_-]{8,200}$/.test(String(discussionId ?? ""))) throw new Error("Invalid Discussion node ID");
+  if (!/^<!-- hrm-approval:[a-f0-9]{64} -->$/.test(String(marker ?? ""))) throw new Error("Invalid approval marker");
+  let after = null;
+  let pages = 0;
+  while (true) {
+    if (pages++ >= 100) throw new Error("GitHub Discussion history exceeds the idempotency scan limit");
+    const data = await githubGraphql({
+      token,
+      query: MARKER_SCAN_QUERY,
+      variables: { discussionId, after },
+      fetchImpl,
+    });
+    const comments = data?.node?.comments;
+    if (!comments) throw new Error("GitHub did not return Discussion comments");
+    const topLevelHit = markerHit(comments.nodes, marker);
+    if (topLevelHit) return topLevelHit;
+    for (const comment of comments.nodes ?? []) {
+      const initialReplyHit = markerHit(comment.replies?.nodes, marker);
+      if (initialReplyHit) return initialReplyHit;
+      const laterReplyHit = await scanRemainingReplies({ comment, marker, token, fetchImpl });
+      if (laterReplyHit) return laterReplyHit;
+    }
+    if (!comments.pageInfo?.hasNextPage) return { found: false, url: "" };
+    after = comments.pageInfo.endCursor;
+  }
+}

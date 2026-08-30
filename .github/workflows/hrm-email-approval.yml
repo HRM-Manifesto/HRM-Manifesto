@@ -1,0 +1,45 @@
+name: HRM Email Approval Processor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+  discussions: write
+
+concurrency:
+  group: hrm-email-approval-processor
+  cancel-in-progress: false
+
+jobs:
+  process:
+    name: Validate email decisions and publish approved replies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out reviewed approval code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install locked mail dependencies
+        run: npm ci --ignore-scripts --omit=dev --prefix forum-steward
+
+      - name: Process signed single-use email approvals
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+          OPENAI_TRANSLATION_MODEL: ${{ vars.OPENAI_TRANSLATION_MODEL || vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+          HRM_NOTIFY_EMAIL: ${{ vars.HRM_NOTIFY_EMAIL }}
+          HRM_APPROVAL_SECRET: ${{ secrets.HRM_APPROVAL_SECRET }}
+          IMAP_HOST: ${{ secrets.IMAP_HOST }}
+          IMAP_PORT: ${{ secrets.IMAP_PORT }}
+          IMAP_USERNAME: ${{ secrets.IMAP_USERNAME }}
+          IMAP_PASSWORD: ${{ secrets.IMAP_PASSWORD }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: node forum-steward/src/email-approval-index.mjs

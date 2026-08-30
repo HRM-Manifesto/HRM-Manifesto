@@ -1,14 +1,6 @@
 import nodemailer from "nodemailer";
-
-const TYPE_LABELS = {
-  question: "New question",
-  criticism: "New criticism",
-  proposal: "New proposal",
-  translation: "New translation topic",
-  "philosophical discussion": "New philosophical discussion",
-  spam: "Possible spam",
-  other: "New discussion",
-};
+import { createApprovalRecord } from "./approval-record.mjs";
+import { escapeHtml } from "./summary.mjs";
 
 function singleLine(value, field) {
   const result = String(value ?? "").trim();
@@ -53,21 +45,58 @@ function sourcesText(sources) {
   )).join("\n");
 }
 
-export function buildAnalysisEmail({ entry, analysis, recipient, repository }) {
+function mailtoLink({ to, subject, body }) {
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+export function buildAnalysisEmail({ entry, analysis, recipient, repository, approval }) {
   const result = analysis.result;
   const to = emailAddress(recipient, "HRM_NOTIFY_EMAIL");
   const workflowUrl = workflowUrlForRepository(repository);
-  const typeLabel = TYPE_LABELS[result.entry_type] ?? TYPE_LABELS.other;
-  const reviewSuffix = result.requires_aleksander_response ? " — response review needed" : "";
-  const subject = `[HRM Forum] ${typeLabel}${reviewSuffix}`;
+  if (!approval?.approvalId || !approval?.shortId || !approval?.block) {
+    throw new Error("Signed approval record is required");
+  }
+  const subject = `[HRM Forum] Review required — ${approval.shortId}`;
   const original = analysis.bodyInfo.body || "(pusty wpis)";
   const truncation = analysis.bodyInfo.truncated
     ? `\n\n[UWAGA: wpis skrócono do ${analysis.bodyInfo.body.length} znaków z ${analysis.bodyInfo.originalLength}.]`
     : "";
 
+  const approveSubject = `HRM APPROVE ${approval.approvalId}`;
+  const rejectSubject = `HRM REJECT ${approval.approvalId}`;
+  const editSubject = `HRM EDIT ${approval.approvalId}`;
+  const approveLink = mailtoLink({ to, subject: approveSubject, body: "ZATWIERDZAM" });
+  const rejectLink = mailtoLink({ to, subject: rejectSubject, body: "NIE ODPOWIADAJ" });
+
   const text = `HRM FORUM STEWARD
 
 Ta analiza służy wyłącznie do ręcznej oceny. Nic nie zostało opublikowane.
+
+DECYZJA ALEKSANDRA
+
+ZATWIERDŹ
+Wyślij nową wiadomość:
+To: ${to}
+Subject: ${approveSubject}
+Body: ZATWIERDZAM
+
+NIE ODPOWIADAJ
+Wyślij nową wiadomość:
+To: ${to}
+Subject: ${rejectSubject}
+Body: NIE ODPOWIADAJ
+
+POPRAW ODPOWIEDŹ
+Odpowiedz nową wiadomością w dokładnym formacie:
+To: ${to}
+Subject: ${editSubject}
+Body:
+POPRAWIAM
+---ODPOWIEDŹ---
+[tutaj pełna poprawiona odpowiedź po polsku]
+---KONIEC---
+
+Samo kliknięcie linku w wersji HTML niczego nie publikuje. Zawsze trzeba nacisnąć Wyślij.
 
 Link do dyskusji:
 ${entry.url || entry.discussionUrl || "brak linku (test ręczny)"}
@@ -116,13 +145,33 @@ PROPOZYCJA ODPOWIEDZI PO POLSKU:
 ${result.proposed_reply_pl || "(brak propozycji)"}
 
 Ta odpowiedź NIE została opublikowana.
-Aby ją opublikować, zatwierdź lub popraw wersję polską i uruchom ręcznie workflow HRM Publish Approved Reply.
+Aby ją opublikować, wyślij jedną z powyższych decyzji albo awaryjnie uruchom ręcznie workflow HRM Publish Approved Reply.
 
-Workflow publikujący:
+Awaryjny workflow publikujący:
 ${workflowUrl}
+
+DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:
+${approval.block}
 `;
 
-  return { to, subject, text };
+  const decisionHtml = `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
+<h2>DECYZJA ALEKSANDRA</h2>
+<p><a href="${escapeHtml(approveLink)}" style="display:inline-block;padding:10px 16px;background:#1f6f50;color:#fff;text-decoration:none">ZATWIERDŹ</a></p>
+<p><a href="${escapeHtml(rejectLink)}" style="display:inline-block;padding:10px 16px;background:#7a2430;color:#fff;text-decoration:none">NIE ODPOWIADAJ</a></p>
+<h3>POPRAW ODPOWIEDŹ</h3>
+<p>Wyślij nową wiadomość do <strong>${escapeHtml(to)}</strong> z tematem:</p>
+<pre>${escapeHtml(editSubject)}</pre>
+<p>i treścią:</p>
+<pre>POPRAWIAM
+---ODPOWIEDŹ---
+[tutaj pełna poprawiona odpowiedź po polsku]
+---KONIEC---</pre>
+<p><strong>Samo kliknięcie przycisku niczego nie publikuje. Trzeba jeszcze wysłać przygotowaną wiadomość.</strong></p>
+</section>`;
+  const visibleText = text.split("DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:")[0];
+  const html = `<!doctype html><html><body><h1>HRM FORUM STEWARD</h1>${decisionHtml}<pre style="white-space:pre-wrap">${escapeHtml(visibleText)}</pre></body></html>`;
+
+  return { to, subject, text, html };
 }
 
 export function smtpConfigFromEnvironment(environment) {
@@ -156,18 +205,88 @@ export async function sendAnalysisEmail({
   analysis,
   environment = process.env,
   transportFactory = nodemailer.createTransport,
+  createApprovalImpl = createApprovalRecord,
+  now = new Date(),
+  randomBytesImpl,
 }) {
   if (String(environment.HRM_EMAIL_ENABLED ?? "true").toLowerCase() === "false") {
     return { sent: false, reason: "disabled" };
   }
   const { from, transport } = smtpConfigFromEnvironment(environment);
+  const approval = createApprovalImpl({
+    entry,
+    analysis,
+    repository: environment.GITHUB_REPOSITORY,
+    secret: environment.HRM_APPROVAL_SECRET,
+    now,
+    randomBytesImpl,
+  });
   const message = buildAnalysisEmail({
     entry,
     analysis,
     recipient: environment.HRM_NOTIFY_EMAIL,
     repository: environment.GITHUB_REPOSITORY,
+    approval,
   });
   const transporter = transportFactory(transport);
   await transporter.sendMail({ from, ...message });
   return { sent: true, reason: "sent" };
+}
+
+export function buildDecisionConfirmationEmail({ recipient, outcome }) {
+  const to = emailAddress(recipient, "HRM_NOTIFY_EMAIL");
+  if (outcome.kind === "rejected") {
+    return {
+      to,
+      subject: "[HRM Forum] Odpowiedź odrzucona",
+      text: "HRM Forum Steward: odpowiedź nie została opublikowana.\n",
+    };
+  }
+  if (outcome.kind === "expired") {
+    return {
+      to,
+      subject: "[HRM Forum] Zatwierdzenie wygasło",
+      text: "HRM Forum Steward: identyfikator zatwierdzenia wygasł. Wymagana jest ponowna analiza i nowe powiadomienie.\n",
+    };
+  }
+  if (outcome.kind !== "published" && outcome.kind !== "already_published") {
+    throw new Error("Invalid confirmation outcome");
+  }
+  const published = outcome.publication;
+  return {
+    to,
+    subject: "[HRM Forum] Odpowiedź opublikowana",
+    text: `ODPOWIEDŹ HRM OPUBLIKOWANA
+
+Discussion:
+${published.discussionUrl}
+
+Język:
+${published.originalLanguage}
+
+Zatwierdzona odpowiedź polska:
+${published.approvedPolishReply}
+
+Opublikowana odpowiedź:
+${published.publishedReply}
+
+Link:
+${published.url}
+`,
+  };
+}
+
+export async function sendDecisionConfirmation({
+  outcome,
+  environment = process.env,
+  transportFactory = nodemailer.createTransport,
+}) {
+  const { from, transport } = smtpConfigFromEnvironment(environment);
+  const message = buildDecisionConfirmationEmail({
+    recipient: environment.HRM_NOTIFY_EMAIL,
+    outcome,
+  });
+  const transporter = transportFactory(transport);
+  await transporter.sendMail({ from, ...message });
+  return { sent: true };
 }

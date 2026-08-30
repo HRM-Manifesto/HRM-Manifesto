@@ -1,4 +1,4 @@
-name: HRM Forum Steward v2
+name: HRM Forum Steward v2.1
 
 on:
   discussion:
@@ -53,6 +53,7 @@ jobs:
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          HRM_APPROVAL_SECRET: ${{ secrets.HRM_APPROVAL_SECRET }}
           OUTPUT_PATH: ${{ runner.temp }}/hrm-forum-steward-analysis.md
         run: node forum-steward/src/index.mjs
 

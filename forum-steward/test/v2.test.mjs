@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { buildAnalysisEmail, sendAnalysisEmail } from "../src/email.mjs";
+import { buildAnalysisEmail, buildDecisionConfirmationEmail, sendAnalysisEmail } from "../src/email.mjs";
+import { createApprovalRecord } from "../src/approval-record.mjs";
 import { parseTarget } from "../src/github-discussions.mjs";
 import { runPublishApprovedReply } from "../src/publish.mjs";
 import { renderPublishSummary } from "../src/publish-summary.mjs";
@@ -15,6 +16,7 @@ import {
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDirectory, "../..");
+const approvalSecret = "test-approval-secret-that-is-at-least-32-characters";
 
 function analysisFixture(overrides = {}) {
   return {
@@ -63,6 +65,17 @@ function entryFixture(overrides = {}) {
   };
 }
 
+function approvalFixture(entry = entryFixture(), analysis = analysisFixture()) {
+  return createApprovalRecord({
+    entry,
+    analysis,
+    repository: "HRM-Manifesto/HRM-Manifesto",
+    secret: approvalSecret,
+    now: new Date("2026-08-30T12:00:00Z"),
+    randomBytesImpl: () => Buffer.alloc(32, 7),
+  });
+}
+
 function openAiFetch(result, observed = { calls: 0 }) {
   return async (_url, options) => {
     observed.calls += 1;
@@ -90,17 +103,21 @@ function translationResult(overrides = {}) {
 }
 
 test("analysis email contains all required Polish review fields", () => {
+  const entry = entryFixture();
+  const analysis = analysisFixture();
   const message = buildAnalysisEmail({
-    entry: entryFixture(),
-    analysis: analysisFixture(),
+    entry,
+    analysis,
     recipient: "manifest@example.com",
     repository: "HRM-Manifesto/HRM-Manifesto",
+    approval: approvalFixture(entry, analysis),
   });
   for (const label of [
     "Link do dyskusji:", "Autor:", "Język oryginału:", "ORYGINAŁ:",
     "TŁUMACZENIE POLSKIE:", "STRESZCZENIE:", "RODZAJ:", "WAŻNOŚĆ:",
     "CZY WYMAGA ALEKSANDRA:", "ŹRÓDŁA HRM:", "INTERPRETATION WARNING:",
     "PROPOZYCJA ODPOWIEDZI PO POLSKU:", "Ta odpowiedź NIE została opublikowana.",
+    "DECYZJA ALEKSANDRA", "ZATWIERDŹ", "NIE ODPOWIADAJ", "POPRAW ODPOWIEDŹ",
   ]) assert.match(message.text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(message.text, /hrm-publish-approved-reply\.yml/);
   assert.equal(message.to, "manifest@example.com");
@@ -117,6 +134,7 @@ test("SMTP secrets are configuration only and never enter email content", async 
     HRM_NOTIFY_EMAIL: "manifest@example.com",
     HRM_EMAIL_ENABLED: "true",
     GITHUB_REPOSITORY: "HRM-Manifesto/HRM-Manifesto",
+    HRM_APPROVAL_SECRET: approvalSecret,
   };
   const transportFactory = (config) => {
     captured.config = config;
@@ -127,11 +145,14 @@ test("SMTP secrets are configuration only and never enter email content", async 
     analysis: analysisFixture(),
     environment,
     transportFactory,
+    randomBytesImpl: () => Buffer.alloc(32, 8),
   });
-  assert.equal(sent.sent, true);
+  assert.deepEqual(sent, { sent: true, reason: "sent" });
   assert.equal(captured.config.secure, true);
-  assert.doesNotMatch(captured.message.text, /smtp-password-secret|smtp-user-secret/);
-  assert.doesNotMatch(captured.message.subject, /smtp-password-secret|smtp-user-secret/);
+  assert.doesNotMatch(captured.message.text, /smtp-password-secret|smtp-user-secret|test-approval-secret/);
+  assert.doesNotMatch(captured.message.subject, /smtp-password-secret|smtp-user-secret|test-approval-secret/);
+  assert.match(captured.message.subject, /Review required — 080808080808$/);
+  assert.doesNotMatch(captured.message.subject, /08080808080808080808/);
 });
 
 test("forum HTML and Markdown remain inert plain text in email", () => {
@@ -143,10 +164,13 @@ test("forum HTML and Markdown remain inert plain text in email", () => {
     analysis,
     recipient: "manifest@example.com",
     repository: "HRM-Manifesto/HRM-Manifesto",
+    approval: approvalFixture(entry, analysis),
   });
-  assert.equal(message.html, undefined);
   assert.match(message.text, /<script>alert\(1\)<\/script>/);
   assert.match(message.text, /!\[track\]/);
+  assert.doesNotMatch(message.html, /<script>alert\(1\)<\/script>/);
+  assert.match(message.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(message.html, /mailto:/);
 });
 
 test("email can be disabled without requiring SMTP secrets", async () => {
@@ -157,6 +181,26 @@ test("email can be disabled without requiring SMTP secrets", async () => {
     transportFactory: () => { throw new Error("must not create transport"); },
   });
   assert.deepEqual(result, { sent: false, reason: "disabled" });
+});
+
+test("publication confirmation is Polish and contains no Approval ID", () => {
+  const approvalId = "a".repeat(64);
+  const message = buildDecisionConfirmationEmail({
+    recipient: "manifest@example.com",
+    outcome: {
+      kind: "published",
+      publication: {
+        discussionUrl: "https://github.com/HRM-Manifesto/HRM-Manifesto/discussions/12",
+        originalLanguage: "en",
+        approvedPolishReply: "Zatwierdzona odpowiedź polska.",
+        publishedReply: "The approved reply.",
+        url: "https://github.com/HRM-Manifesto/HRM-Manifesto/discussions/12#discussioncomment-1",
+      },
+    },
+  });
+  assert.match(message.text, /ODPOWIEDŹ HRM OPUBLIKOWANA/);
+  assert.doesNotMatch(message.text, new RegExp(approvalId));
+  assert.equal(message.html, undefined);
 });
 
 test("manual publish without exact PUBLISH performs no calls", async () => {
@@ -360,6 +404,7 @@ test("publish summary escapes approved and translated Markdown", () => {
 test("automatic and publishing workflows have isolated triggers and permissions", async () => {
   const automatic = await readFile(path.join(repoRoot, ".github/workflows/hrm-forum-steward.yml"), "utf8");
   const publishing = await readFile(path.join(repoRoot, ".github/workflows/hrm-publish-approved-reply.yml"), "utf8");
+  const emailApproval = await readFile(path.join(repoRoot, ".github/workflows/hrm-email-approval.yml"), "utf8");
   assert.match(automatic, /discussion:\s*\n\s+types: \[created\]/);
   assert.match(automatic, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: read/);
   assert.doesNotMatch(automatic, /discussions: write/);
@@ -367,6 +412,11 @@ test("automatic and publishing workflows have isolated triggers and permissions"
   assert.doesNotMatch(publishing, /discussion(?:_comment)?:\s*\n/);
   assert.match(publishing, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: write/);
   assert.doesNotMatch(publishing, /(?:contents|issues|pull-requests): write/);
+  assert.match(emailApproval, /workflow_dispatch:\s*\n\s+schedule:/);
+  assert.match(emailApproval, /cron: '\*\/5 \* \* \* \*'/);
+  assert.match(emailApproval, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: write/);
+  assert.doesNotMatch(emailApproval, /(?:contents|issues|pull-requests|actions): write/);
+  assert.doesNotMatch(emailApproval, /discussion(?:_comment)?:\s*\n/);
 });
 
 test("local Polish detector recognizes the production-style Polish question", () => {

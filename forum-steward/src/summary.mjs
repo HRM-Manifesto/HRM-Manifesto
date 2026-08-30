@@ -29,7 +29,7 @@ export function renderSummary({ entry, analysis, error = null, notification = nu
   const entryUrl = safeUrl(entry.url);
   const entryLabel = entryUrl ? `[Open forum entry](${entryUrl})` : "Manual test or URL unavailable";
   const lines = [
-    "# HRM Forum Steward v2 — analiza nieopublikowana",
+    "# HRM Forum Steward v2.1 — analiza nieopublikowana",
     "",
     "> **READ / ANALYZE / PROPOSE only. Nic nie zostało opublikowane w GitHub Discussions.**",
     "",
