@@ -61,7 +61,7 @@ Workflow `.github/workflows/hrm-email-approval.yml` uruchamia się ręcznie albo
 - `From` jest dokładnie zgodny z `HRM_NOTIFY_EMAIL`;
 - komenda ma dokładny dozwolony format.
 
-Po przetworzeniu wiadomości są przenoszone do `HRM/Processed` albo `HRM/Rejected`. Nieprawidłowe kandydaty trafiają do `HRM/Invalid`, a decyzje zakończone bez publikacji wskutek błędu do `HRM/Failed`. Brakujące foldery są tworzone automatycznie. Sprawy z `HRM/Failed` nie są automatycznie ponawiane co 5 minut; wymagają ręcznego sprawdzenia i ewentualnie awaryjnego workflow.
+Po przetworzeniu wiadomości są przenoszone do folderów HRM: `Processed`, `Rejected`, `Invalid` albo `Failed`. Procesor pobiera separator hierarchii zgłoszony przez serwer IMAP, więc nie zakłada na sztywno `/`. Tworzenie jest idempotentne. Jeżeli serwer nie obsługuje folderów zagnieżdżonych, używane są bezpieczne nazwy płaskie: `HRM-Processed`, `HRM-Rejected`, `HRM-Failed` i `HRM-Invalid`. Sprawy z folderu `Failed` nie są automatycznie ponawiane co 5 minut; wymagają ręcznego sprawdzenia i ewentualnie awaryjnego workflow.
 
 Przed publikacją procesor sprawdza nieodwracalny marker SHA-256 Approval ID w komentarzach Discussion. Chroni to przed ponowną publikacją po restarcie lub błędzie sieciowym. Pełne Approval ID nie trafia do komentarza.
 
@@ -242,7 +242,10 @@ Otwórz **Actions → HRM Email Approval Processor**, wybierz menu i kliknij **D
 ## Troubleshooting
 
 - **Brak e-maila analizy:** sprawdź `HRM_EMAIL_ENABLED`, SMTP Secrets i Job Summary. Nie drukuj wartości sekretów.
-- **Procesor nie łączy się:** porównaj host, port SSL/TLS, login i hasło z instrukcją IMAP operatora. Nie używaj POP3.
+- **Procesor nie łączy się:** Job Summary pokazuje wyłącznie bezpieczną kategorię (`CONFIG`, `DNS_CONNECT`, `TLS`, `AUTH`, `FOLDER_CREATE`, `INBOX_LOCK`, `SEARCH`, `FETCH`, `MOVE`, `LOGOUT` albo `UNKNOWN`), kod protokołu i etap. Nie pokazuje hosta, loginu, hasła, Approval ID ani treści wiadomości.
+- **CONFIG:** sprawdź, czy wszystkie wymagane wartości istnieją i czy port jest liczbą.
+- **DNS_CONNECT / TLS / AUTH:** porównaj ustawienia z oficjalną instrukcją IMAP operatora; nie używaj POP3 ani parametrów SMTP bez potwierdzenia.
+- **FOLDER_CREATE:** sprawdź uprawnienie skrzynki do tworzenia folderów. Procesor sam obsługuje istniejące foldery, delimiter serwera i tryb płaski.
 - **Decyzja jest nieprawidłowa:** sprawdź dokładny temat, pełne Approval ID, adres From i dokładną treść komendy.
 - **Approval wygasł:** wykonaj nową analizę, aby otrzymać nowe powiadomienie.
 - **Publikacja nie nastąpiła:** sprawdź Job Summary procesora. Przy błędzie GitHub lub tłumaczenia wiadomości pozostają nieoznaczone jako successful.

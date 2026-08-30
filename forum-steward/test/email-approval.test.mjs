@@ -9,7 +9,9 @@ import {
 } from "../src/approval-record.mjs";
 import { parseDecisionMessage } from "../src/approval-parser.mjs";
 import { processApprovalMailbox } from "../src/email-approval.mjs";
-import { IMAP_FOLDERS, imapConfigFromEnvironment, withApprovalMailbox } from "../src/imap-mailbox.mjs";
+import { renderEmailApprovalSummary } from "../src/email-approval-summary.mjs";
+import { imapDiagnosticSummary } from "../src/imap-diagnostics.mjs";
+import { ensureImapFolders, IMAP_FOLDERS, imapConfigFromEnvironment, withApprovalMailbox } from "../src/imap-mailbox.mjs";
 import { translateApprovedReply } from "../src/translate.mjs";
 
 const secret = "test-approval-secret-that-is-at-least-32-characters";
@@ -328,8 +330,13 @@ test("IMAP adapter creates safe folders and moves only through the mailbox abstr
   const moved = [];
   const fakeClient = {
     usable: true,
+    namespace: { prefix: "", delimiter: "/" },
     async connect() {},
-    async mailboxCreate(folder) { createdFolders.push(folder); },
+    async list() { return []; },
+    async mailboxCreate(folder) {
+      createdFolders.push(folder);
+      return { path: Array.isArray(folder) ? folder.join("/") : folder, created: true };
+    },
     async getMailboxLock() { return { release() {} }; },
     async search() { return []; },
     async messageMove(uid, folder) { moved.push({ uid, folder }); },
@@ -339,9 +346,9 @@ test("IMAP adapter creates safe folders and moves only through the mailbox abstr
     environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
     clientFactory: () => fakeClient,
     now,
-    handler: async (box) => { await box.move(5, IMAP_FOLDERS.processed); },
+    handler: async (box) => { await box.move(5, box.folders.processed); },
   });
-  assert.deepEqual(createdFolders, Object.values(IMAP_FOLDERS));
+  assert.deepEqual(createdFolders, ["HRM", ["HRM", "Processed"], ["HRM", "Rejected"], ["HRM", "Failed"], ["HRM", "Invalid"]]);
   assert.deepEqual(moved, [{ uid: 5, folder: IMAP_FOLDERS.processed }]);
 });
 
@@ -351,6 +358,145 @@ test("IMAP network error prevents the processor handler from running", async () 
     environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
     clientFactory: () => ({ usable: false, async connect() { throw new Error("network"); } }),
     handler: async () => { handlerCalls += 1; },
-  }), /network/);
+  }), (error) => error.category === "UNKNOWN" && error.stage === "CONNECT");
   assert.equal(handlerCalls, 0);
+});
+
+test("IMAP authentication error is categorized without credentials", async () => {
+  const authError = Object.assign(new Error("contains sensitive server text"), {
+    authenticationFailed: true,
+    serverResponseCode: "AUTHENTICATIONFAILED",
+    responseStatus: "NO",
+  });
+  await assert.rejects(() => withApprovalMailbox({
+    environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "private-user", IMAP_PASSWORD: "private-password" },
+    clientFactory: () => ({ usable: false, async connect() { throw authError; } }),
+    handler: async () => {},
+  }), (error) => {
+    const diagnostic = imapDiagnosticSummary(error);
+    assert.deepEqual(diagnostic, { category: "AUTH", safeCode: "AUTHENTICATIONFAILED/NO", stage: "CONNECT" });
+    assert.doesNotMatch(JSON.stringify(diagnostic), /private-user|private-password|sensitive server text/);
+    return true;
+  });
+});
+
+test("IMAP TLS error is categorized without exposing endpoint details", async () => {
+  const tlsError = Object.assign(new Error("certificate for secret.example"), { code: "CERT_HAS_EXPIRED" });
+  await assert.rejects(() => withApprovalMailbox({
+    environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
+    clientFactory: () => ({ usable: false, async connect() { throw tlsError; } }),
+    handler: async () => {},
+  }), (error) => {
+    const diagnostic = imapDiagnosticSummary(error);
+    assert.deepEqual(diagnostic, { category: "TLS", safeCode: "CERT_HAS_EXPIRED", stage: "CONNECT" });
+    assert.doesNotMatch(JSON.stringify(diagnostic), /secret\.example/);
+    return true;
+  });
+});
+
+test("IMAP DNS/connect error receives the DNS_CONNECT category", async () => {
+  await assert.rejects(() => withApprovalMailbox({
+    environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
+    clientFactory: () => ({ usable: false, async connect() { throw Object.assign(new Error("dns"), { code: "ENOTFOUND" }); } }),
+    handler: async () => {},
+  }), (error) => error.category === "DNS_CONNECT" && error.safeCode === "ENOTFOUND" && error.stage === "CONNECT");
+});
+
+test("folder discovery failure receives the FOLDER_CREATE category", async () => {
+  const fakeClient = {
+    usable: true,
+    async connect() {},
+    async list() { throw Object.assign(new Error("folder list failed"), { responseStatus: "NO", serverResponseCode: "CANNOT" }); },
+    async logout() {},
+  };
+  await assert.rejects(() => withApprovalMailbox({
+    environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
+    clientFactory: () => fakeClient,
+    handler: async () => {},
+  }), (error) => error.category === "FOLDER_CREATE" && error.stage === "FOLDER_DISCOVER_CREATE");
+});
+
+test("IMAP failure Job Summary renders only category, safe code, and stage", () => {
+  const sensitive = "private-password private-user secret-host.example " + "a".repeat(64);
+  const summary = renderEmailApprovalSummary({
+    failure: {
+      category: "AUTH",
+      safeCode: "AUTHENTICATIONFAILED",
+      stage: "CONNECT",
+      message: sensitive,
+      host: "secret-host.example",
+    },
+  });
+  assert.match(summary, /Kategoria: `AUTH`/);
+  assert.match(summary, /Kod bezpieczny: `AUTHENTICATIONFAILED`/);
+  assert.match(summary, /Etap: `CONNECT`/);
+  assert.doesNotMatch(summary, /private-password|private-user|secret-host|a{64}/);
+});
+
+test("existing IMAP folders make creation idempotent", async () => {
+  let createCalls = 0;
+  const client = {
+    namespace: { prefix: "", delimiter: "/" },
+    async list() {
+      return Object.values(IMAP_FOLDERS).map((path) => ({ path, delimiter: "/" }));
+    },
+    async mailboxCreate() { createCalls += 1; throw new Error("must not create an existing folder"); },
+  };
+  const result = await ensureImapFolders(client);
+  assert.equal(createCalls, 0);
+  assert.deepEqual(result.folders, IMAP_FOLDERS);
+  assert.equal(result.nested, true);
+});
+
+test("server hierarchy delimiter is used instead of assuming slash", async () => {
+  const requests = [];
+  const client = {
+    namespace: { prefix: "", delimiter: "." },
+    async list() { return []; },
+    async mailboxCreate(request) {
+      requests.push(request);
+      return { path: Array.isArray(request) ? request.join(".") : request, created: true };
+    },
+  };
+  const result = await ensureImapFolders(client);
+  assert.equal(result.folders.processed, "HRM.Processed");
+  assert.deepEqual(requests[1], ["HRM", "Processed"]);
+  assert.equal(result.delimiter, ".");
+});
+
+test("server without nested folders uses safe flat names", async () => {
+  const requests = [];
+  const client = {
+    namespace: { prefix: "", delimiter: null },
+    async list() { return []; },
+    async mailboxCreate(request) { requests.push(request); return { path: request, created: true }; },
+  };
+  const result = await ensureImapFolders(client);
+  assert.equal(result.nested, false);
+  assert.deepEqual(result.folders, {
+    root: "HRM",
+    processed: "HRM-Processed",
+    rejected: "HRM-Rejected",
+    failed: "HRM-Failed",
+    invalid: "HRM-Invalid",
+  });
+  assert.ok(requests.every((request) => typeof request === "string"));
+});
+
+test("server rejecting child folders falls back to flat names", async () => {
+  const requests = [];
+  const client = {
+    namespace: { prefix: "", delimiter: "/" },
+    async list() { return []; },
+    async mailboxCreate(request) {
+      requests.push(request);
+      if (Array.isArray(request)) throw Object.assign(new Error("inferior mailboxes disabled"), { responseStatus: "NO" });
+      return { path: request, created: true };
+    },
+  };
+  const result = await ensureImapFolders(client);
+  assert.equal(result.nested, false);
+  assert.equal(result.folders.processed, "HRM-Processed");
+  assert.ok(requests.some((request) => Array.isArray(request)));
+  assert.ok(requests.includes("HRM-Processed"));
 });

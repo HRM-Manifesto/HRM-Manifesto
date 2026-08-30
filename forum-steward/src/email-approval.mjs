@@ -33,6 +33,7 @@ export async function processApprovalMailbox({
   sendConfirmationImpl = sendDecisionConfirmation,
 }) {
   const { repository, notifyEmail } = safeEnvironment(environment);
+  const folders = mailbox.folders ?? IMAP_FOLDERS;
   const report = {
     published: 0,
     rejected: 0,
@@ -52,8 +53,8 @@ export async function processApprovalMailbox({
       if (record.repository.toLowerCase() !== repository.toLowerCase()) throw new Error("Approval repository mismatch");
       if (pending.has(record.approvalId)) {
         const prior = pending.get(record.approvalId);
-        await mailbox.move(prior.message.uid, IMAP_FOLDERS.invalid);
-        await mailbox.move(message.uid, IMAP_FOLDERS.invalid);
+        await mailbox.move(prior.message.uid, folders.invalid);
+        await mailbox.move(message.uid, folders.invalid);
         report.invalid += 2;
         ambiguousIds.add(record.approvalId);
         pending.delete(record.approvalId);
@@ -61,7 +62,7 @@ export async function processApprovalMailbox({
         pending.set(record.approvalId, { message, record });
       }
     } catch {
-      await mailbox.move(message.uid, IMAP_FOLDERS.invalid);
+      await mailbox.move(message.uid, folders.invalid);
       report.invalid += 1;
     }
   }
@@ -77,21 +78,21 @@ export async function processApprovalMailbox({
         authorizedEmail: notifyEmail,
       });
     } catch {
-      await mailbox.move(message.uid, IMAP_FOLDERS.invalid);
+      await mailbox.move(message.uid, folders.invalid);
       report.invalid += 1;
       continue;
     }
 
     const item = pending.get(decision.approvalId);
     if (!item || ambiguousIds.has(decision.approvalId)) {
-      await mailbox.move(message.uid, IMAP_FOLDERS.invalid);
+      await mailbox.move(message.uid, folders.invalid);
       report.invalid += 1;
       continue;
     }
     pending.delete(decision.approvalId);
 
     if (approvalIsExpired(item.record, now)) {
-      await movePair(mailbox, item.message.uid, message.uid, IMAP_FOLDERS.rejected);
+      await movePair(mailbox, item.message.uid, message.uid, folders.rejected);
       report.expired += 1;
       try {
         await sendConfirmationImpl({ outcome: { kind: "expired" }, environment });
@@ -102,7 +103,7 @@ export async function processApprovalMailbox({
     }
 
     if (decision.kind === "reject") {
-      await movePair(mailbox, item.message.uid, message.uid, IMAP_FOLDERS.rejected);
+      await movePair(mailbox, item.message.uid, message.uid, folders.rejected);
       report.rejected += 1;
       try {
         await sendConfirmationImpl({ outcome: { kind: "rejected" }, environment });
@@ -116,7 +117,7 @@ export async function processApprovalMailbox({
       ? decision.approvedPolishReply
       : item.record.proposedPolishReply;
     if (!approvedPolishReply.trim() || approvedPolishReply.includes(item.record.approvalId)) {
-      await mailbox.move(message.uid, IMAP_FOLDERS.invalid);
+      await mailbox.move(message.uid, folders.invalid);
       report.invalid += 1;
       continue;
     }
@@ -136,7 +137,7 @@ export async function processApprovalMailbox({
         fetchImpl,
       });
       if (existing.found) {
-        await movePair(mailbox, item.message.uid, message.uid, IMAP_FOLDERS.processed);
+        await movePair(mailbox, item.message.uid, message.uid, folders.processed);
         report.duplicates += 1;
         continue;
       }
@@ -161,7 +162,7 @@ export async function processApprovalMailbox({
         token: environment.GITHUB_TOKEN,
         fetchImpl,
       });
-      await movePair(mailbox, item.message.uid, message.uid, IMAP_FOLDERS.processed);
+      await movePair(mailbox, item.message.uid, message.uid, folders.processed);
       report.published += 1;
       try {
         await sendConfirmationImpl({
@@ -180,10 +181,12 @@ export async function processApprovalMailbox({
       } catch {
         report.confirmationFailures += 1;
       }
-    } catch {
+    } catch (error) {
+      if (error?.category === "MOVE") throw error;
       try {
-        await movePair(mailbox, item.message.uid, message.uid, IMAP_FOLDERS.failed);
-      } catch {
+        await movePair(mailbox, item.message.uid, message.uid, folders.failed);
+      } catch (moveError) {
+        if (moveError?.category === "MOVE") throw moveError;
         // The public idempotency marker still prevents a duplicate if publication succeeded before a network failure.
       }
       report.failures += 1;
