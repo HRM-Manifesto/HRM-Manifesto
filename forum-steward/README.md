@@ -64,4 +64,4 @@ cd forum-steward
 npm test
 ```
 
-The tests cover an ordinary question, the canonical present-day-AI regression, criticism, Polish and English entries, prompt injection, spam, an empty entry, a very long entry, event parsing, output escaping, and workflow permissions.
+The tests cover an ordinary question, English and Polish canonical present-day-AI regressions, criticism, Polish and English entries, prompt injection, spam, an empty entry, a very long entry, event parsing, output escaping, and workflow permissions.

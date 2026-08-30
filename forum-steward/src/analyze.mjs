@@ -28,6 +28,8 @@ Substantive boundary:
 - Do not invent, extend, reinterpret, or change the official position.
 - Clearly warn whenever a useful reply would require interpretation beyond the supplied official text.
 - When a canonical or dynamically selected excerpt directly answers the entry, set interpretation_warning to false, leave interpretation_warning_reason empty, and do not claim that the official materials are silent or ambiguous on that point.
+- Faithfully translating a directly stated official rule into the entry author's language is still direct source support, not interpretation. Translation alone MUST NOT trigger interpretation_warning.
+- Set interpretation_warning to true only when the proposed reply adds an inference, extension, application, or position that is not stated directly in the supplied official excerpts.
 - Cite only supplied source paths and section headings.
 - Detect Polish, English, or Swedish and write proposed_reply in the author's language. For other languages, use English and set language to other.
 - Keep the summary and proposed reply short, calm, respectful, and non-authoritative.

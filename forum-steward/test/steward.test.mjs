@@ -163,6 +163,55 @@ test("canonical core and ranked excerpts share the existing source limits", asyn
   assert.equal(selected.filter((chunk) => chunk.core).length, 2);
 });
 
+test("faithful Polish translation of a canonical rule is not interpretation", async () => {
+  const question = "Czy według HRM każda obecna sztuczna inteligencja jest już podmiotem i posiada prawa?";
+  const expectedReply = "Nie. HRM nie zakłada, że każdy współczesny system AI jest automatycznie podmiotem. Prawa opisane przez HRM dotyczą podmiotu AI po przekroczeniu Progu Podmiotowości.";
+  const observed = { calls: 0 };
+  const modelResult = (request) => {
+    assert.match(request.instructions, /Translation alone MUST NOT trigger interpretation_warning/);
+    assert.match(request.input, /Czy według HRM każda obecna sztuczna inteligencja jest już podmiotem i posiada prawa\?/);
+    assert.match(
+      request.input,
+      /HRM does not assume that every contemporary AI system is automatically a subject\./,
+    );
+    return result({
+      language: "pl",
+      relevant_sources: [{
+        path: "README.md",
+        section: "What is HRM?",
+        relevance: "Sekcja bezpośrednio rozróżnia współczesne systemy AI od podmiotów AI.",
+      }],
+      proposed_reply: expectedReply,
+      requires_aleksander_response: false,
+      confidence: 0.99,
+      interpretation_warning: false,
+      interpretation_warning_reason: "",
+    });
+  };
+
+  const analysis = await analyzeEntry({
+    entry: {
+      eventType: "discussion",
+      title: "Obecna AI a podmiotowość",
+      body: question,
+      author: "tester",
+      url: "",
+      category: "Q&A",
+    },
+    repoRoot,
+    apiKey: "test-key-not-a-secret",
+    model: "test-model",
+    fetchImpl: fakeFetchFor(modelResult, observed),
+  });
+
+  assert.equal(observed.calls, 1);
+  assert.equal(analysis.result.language, "pl");
+  assert.equal(analysis.result.proposed_reply, expectedReply);
+  assert.equal(analysis.result.requires_aleksander_response, false);
+  assert.equal(analysis.result.interpretation_warning, false);
+  assert.equal(analysis.result.interpretation_warning_reason, "");
+});
+
 test("criticism is preserved as a criticism result", async () => {
   const { analysis } = await runCase(
     "HRM's threshold is vague and impossible to apply consistently.",
