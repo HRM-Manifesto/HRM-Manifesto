@@ -1,4 +1,4 @@
-name: HRM Forum Steward
+name: HRM Forum Steward v2
 
 on:
   discussion:
@@ -39,10 +39,20 @@ jobs:
       - name: Check out official HRM sources
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Install locked SMTP dependency
+        run: npm ci --ignore-scripts --omit=dev --prefix forum-steward
+
       - name: Analyze untrusted forum entry
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+          HRM_NOTIFY_EMAIL: ${{ vars.HRM_NOTIFY_EMAIL }}
+          HRM_EMAIL_ENABLED: ${{ vars.HRM_EMAIL_ENABLED || 'true' }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
           OUTPUT_PATH: ${{ runner.temp }}/hrm-forum-steward-analysis.md
         run: node forum-steward/src/index.mjs
 

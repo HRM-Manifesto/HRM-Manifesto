@@ -12,6 +12,10 @@ export function entryFromEvent(eventName, payload) {
       body: text(payload.discussion?.body),
       author: text(payload.discussion?.user?.login),
       url: text(payload.discussion?.html_url),
+      nodeId: text(payload.discussion?.node_id),
+      discussionNodeId: text(payload.discussion?.node_id),
+      discussionNumber: Number.isInteger(payload.discussion?.number) ? payload.discussion.number : null,
+      discussionUrl: text(payload.discussion?.html_url),
       category: text(payload.discussion?.category?.name),
     };
   }
@@ -23,6 +27,10 @@ export function entryFromEvent(eventName, payload) {
       body: text(payload.comment?.body),
       author: text(payload.comment?.user?.login),
       url: text(payload.comment?.html_url),
+      nodeId: text(payload.comment?.node_id),
+      discussionNodeId: text(payload.discussion?.node_id),
+      discussionNumber: Number.isInteger(payload.discussion?.number) ? payload.discussion.number : null,
+      discussionUrl: text(payload.discussion?.html_url),
       category: text(payload.discussion?.category?.name),
     };
   }
@@ -35,6 +43,10 @@ export function entryFromEvent(eventName, payload) {
       body: text(inputs.content),
       author: text(inputs.author) || "workflow_dispatch",
       url: "",
+      nodeId: "",
+      discussionNodeId: "",
+      discussionNumber: null,
+      discussionUrl: "",
       category: "manual test",
     };
   }

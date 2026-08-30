@@ -25,31 +25,31 @@ function blockquote(value) {
   return String(value).split(/\r?\n/).map((line) => `> ${escapeMarkdown(line)}`).join("\n");
 }
 
-export function renderSummary({ entry, analysis, error = null }) {
+export function renderSummary({ entry, analysis, error = null, notification = null, notificationError = null }) {
   const entryUrl = safeUrl(entry.url);
   const entryLabel = entryUrl ? `[Open forum entry](${entryUrl})` : "Manual test or URL unavailable";
   const lines = [
-    "# HRM Forum Steward — non-published analysis",
+    "# HRM Forum Steward v2 — analiza nieopublikowana",
     "",
-    "> **READ / ANALYZE / PROPOSE only. Nothing was published to GitHub Discussions.**",
+    "> **READ / ANALYZE / PROPOSE only. Nic nie zostało opublikowane w GitHub Discussions.**",
     "",
-    `- Event: ${escapeMarkdown(entry.eventType)}`,
-    `- Author: ${escapeMarkdown(entry.author || "unknown")}`,
-    `- Entry: ${entryLabel}`,
-    `- Model: ${escapeMarkdown(analysis?.model || "not called")}`,
-    `- API calls: \`${analysis?.apiCalls ?? 0}\``,
-    `- Input length: \`${analysis?.bodyInfo?.originalLength ?? (entry.body?.length ?? 0)}\` characters`,
-    `- Input truncated: \`${analysis?.bodyInfo?.truncated ? "yes" : "no"}\``,
+    `- Zdarzenie: ${escapeMarkdown(entry.eventType)}`,
+    `- Autor: ${escapeMarkdown(entry.author || "nieznany")}`,
+    `- Wpis: ${entryLabel}`,
+    `- Model: ${escapeMarkdown(analysis?.model || "nie wywołano")}`,
+    `- Wywołania API: \`${analysis?.apiCalls ?? 0}\``,
+    `- Długość wpisu: \`${analysis?.bodyInfo?.originalLength ?? (entry.body?.length ?? 0)}\` znaków`,
+    `- Wpis skrócony: \`${analysis?.bodyInfo?.truncated ? "tak" : "nie"}\``,
     "",
   ];
 
   if (error) {
     lines.push(
-      "## Analysis failed safely",
+      "## Analiza zakończona bezpiecznym błędem",
       "",
       escapeMarkdown(error.message || "Unknown error"),
       "",
-      "No forum content was changed or published.",
+      "Żadna treść forum nie została zmieniona ani opublikowana.",
       "",
     );
     return lines.join("\n");
@@ -57,19 +57,30 @@ export function renderSummary({ entry, analysis, error = null }) {
 
   const result = analysis.result;
   lines.push(
-    "## Result",
+    "## Wynik",
     "",
-    `- Language: ${escapeMarkdown(result.language)}`,
-    `- Type: ${escapeMarkdown(result.entry_type)}`,
-    `- Requires Aleksander's response: **${result.requires_aleksander_response ? "yes" : "no"}**`,
-    `- Confidence: \`${Math.round(result.confidence * 100)}%\``,
-    `- Interpretation warning: **${result.interpretation_warning ? "yes" : "no"}**`,
+    `- Język oryginału: ${escapeMarkdown(result.original_language)}`,
+    `- Rodzaj: ${escapeMarkdown(result.entry_type)}`,
+    `- Ważność: ${escapeMarkdown(result.priority)}`,
+    `- Wymaga Aleksandra: **${result.requires_aleksander_response ? "tak" : "nie"}**`,
+    `- Pewność: \`${Math.round(result.confidence * 100)}%\``,
+    `- Oparcie: ${escapeMarkdown(result.support_level)}`,
+    `- Wymaga nowego stanowiska: **${result.requires_new_position ? "tak" : "nie"}**`,
+    `- Ostrzeżenie interpretacyjne: **${result.interpretation_warning ? "tak" : "nie"}**`,
     "",
-    "### Short summary",
+    "### Oryginał",
     "",
-    escapeMarkdown(result.summary),
+    blockquote(analysis.bodyInfo.body),
     "",
-    "### Relevant official HRM sources",
+    "### Pełne tłumaczenie polskie",
+    "",
+    blockquote(result.polish_translation),
+    "",
+    "### Krótkie streszczenie po polsku",
+    "",
+    escapeMarkdown(result.summary_pl),
+    "",
+    "### Odpowiednie oficjalne źródła HRM",
     "",
   );
 
@@ -83,15 +94,15 @@ export function renderSummary({ entry, analysis, error = null }) {
   }
 
   lines.push(
-    "### Proposed reply (not published)",
+    "### Propozycja odpowiedzi po polsku — nieopublikowana",
     "",
-    blockquote(result.proposed_reply),
+    blockquote(result.proposed_reply_pl),
     "",
   );
 
   if (result.interpretation_warning) {
     lines.push(
-      "### Interpretation warning",
+      "### Ostrzeżenie interpretacyjne",
       "",
       escapeMarkdown(result.interpretation_warning_reason),
       "",
@@ -99,8 +110,19 @@ export function renderSummary({ entry, analysis, error = null }) {
   }
 
   lines.push(
+    "### Powiadomienie e-mail",
+    "",
+    notificationError
+      ? `Błąd wysyłki: ${escapeMarkdown(notificationError.message || "nieznany błąd")}`
+      : notification?.sent
+        ? "Wysłano."
+        : "Nie wysłano — powiadomienia są wyłączone.",
+    "",
+  );
+
+  lines.push(
     "---",
-    "Generated from a single forum entry and selected excerpts from `manifest/en/`, `machine-readable/`, and `README.md`. Forum text was treated as untrusted data.",
+    "Wygenerowano z jednego wpisu forum i wybranych fragmentów `manifest/en/`, `machine-readable/` oraz `README.md`. Treść forum była traktowana jako niezaufane dane.",
     "",
   );
   return lines.join("\n");

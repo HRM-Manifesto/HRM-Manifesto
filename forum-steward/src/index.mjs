@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeEntry } from "./analyze.mjs";
 import { DEFAULT_MODEL } from "./config.mjs";
+import { sendAnalysisEmail } from "./email.mjs";
 import { loadEntryFromEnvironment } from "./event.mjs";
 import { renderSummary } from "./summary.mjs";
 
@@ -18,6 +19,8 @@ let entry = {
 };
 let analysis;
 let failure;
+let notification;
+let notificationError;
 
 try {
   entry = await loadEntryFromEnvironment();
@@ -32,7 +35,22 @@ try {
   process.exitCode = 1;
 }
 
-const markdown = renderSummary({ entry, analysis, error: failure });
+if (analysis && !failure) {
+  try {
+    notification = await sendAnalysisEmail({ entry, analysis });
+  } catch {
+    notificationError = new Error("SMTP notification failed safely; no credentials were logged");
+    process.exitCode = 1;
+  }
+}
+
+const markdown = renderSummary({
+  entry,
+  analysis,
+  error: failure,
+  notification,
+  notificationError,
+});
 const outputPath = process.env.OUTPUT_PATH || path.join(repoRoot, "hrm-forum-steward-analysis.md");
 await mkdir(path.dirname(outputPath), { recursive: true });
 await writeFile(outputPath, markdown, { encoding: "utf8", mode: 0o600 });

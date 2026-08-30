@@ -1,0 +1,42 @@
+name: HRM Publish Approved Reply
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Discussion number/URL or node ID copied from the review email
+        required: true
+        type: string
+      approved_polish_reply:
+        description: Full Polish reply approved or corrected by Aleksander
+        required: true
+        type: string
+      confirmation:
+        description: Type PUBLISH exactly to authorize publication
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  discussions: write
+
+concurrency:
+  group: hrm-publish-approved-reply-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish manually approved reply
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out reviewed publishing code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate approval, translate if needed, and publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+          OPENAI_TRANSLATION_MODEL: ${{ vars.OPENAI_TRANSLATION_MODEL || vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+        run: node forum-steward/src/publish-index.mjs
