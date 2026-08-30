@@ -1,6 +1,6 @@
-import { approvalHash, approvalIsExpired, approvalMarker, readApprovalRecord } from "./approval-record.mjs";
+import { approvalIsExpired, readApprovalRecord } from "./approval-record.mjs";
 import { looksLikeDecisionSubject, parseDecisionMessage } from "./approval-parser.mjs";
-import { DEFAULT_MODEL } from "./config.mjs";
+import { executeApprovedReply } from "./approval-publication.mjs";
 import { sendDecisionConfirmation } from "./email.mjs";
 import { findApprovalMarker, publishDiscussionReply, resolveTarget } from "./github-discussions.mjs";
 import { IMAP_FOLDERS } from "./imap-mailbox.mjs";
@@ -30,10 +30,12 @@ export async function processApprovalMailbox({
   translateImpl = translateApprovedReply,
   findMarkerImpl = findApprovalMarker,
   publishImpl = publishDiscussionReply,
+  executeApprovedReplyImpl = executeApprovedReply,
   sendConfirmationImpl = sendDecisionConfirmation,
 }) {
   const { repository, notifyEmail } = safeEnvironment(environment);
   const folders = mailbox.folders ?? IMAP_FOLDERS;
+  const confirmationEmails = String(environment.HRM_CONFIRMATION_EMAILS ?? "false").toLowerCase() === "true";
   const report = {
     published: 0,
     rejected: 0,
@@ -47,9 +49,14 @@ export async function processApprovalMailbox({
   const ambiguousIds = new Set();
 
   for (const message of mailbox.messages) {
-    if (!message.subject.startsWith("[HRM Forum] Review required")) continue;
+    if (!message.subject.startsWith("[HRM Forum] Review required")
+      && !message.subject.startsWith("[HRM] Odpowiedź do zatwierdzenia")
+      && !message.subject.startsWith("[HRM] Potrzebna Twoja decyzja")) continue;
     try {
-      const record = readApprovalRecord({ text: message.text, secret: environment.HRM_APPROVAL_SECRET });
+      const record = readApprovalRecord({
+        text: message.approvalRecord || message.text,
+        secret: environment.HRM_APPROVAL_SECRET,
+      });
       if (record.repository.toLowerCase() !== repository.toLowerCase()) throw new Error("Approval repository mismatch");
       if (pending.has(record.approvalId)) {
         const prior = pending.get(record.approvalId);
@@ -94,10 +101,12 @@ export async function processApprovalMailbox({
     if (approvalIsExpired(item.record, now)) {
       await movePair(mailbox, item.message.uid, message.uid, folders.rejected);
       report.expired += 1;
-      try {
-        await sendConfirmationImpl({ outcome: { kind: "expired" }, environment });
-      } catch {
-        report.confirmationFailures += 1;
+      if (confirmationEmails) {
+        try {
+          await sendConfirmationImpl({ outcome: { kind: "expired" }, environment });
+        } catch {
+          report.confirmationFailures += 1;
+        }
       }
       continue;
     }
@@ -105,10 +114,12 @@ export async function processApprovalMailbox({
     if (decision.kind === "reject") {
       await movePair(mailbox, item.message.uid, message.uid, folders.rejected);
       report.rejected += 1;
-      try {
-        await sendConfirmationImpl({ outcome: { kind: "rejected" }, environment });
-      } catch {
-        report.confirmationFailures += 1;
+      if (confirmationEmails) {
+        try {
+          await sendConfirmationImpl({ outcome: { kind: "rejected" }, environment });
+        } catch {
+          report.confirmationFailures += 1;
+        }
       }
       continue;
     }
@@ -129,63 +140,29 @@ export async function processApprovalMailbox({
     }
 
     try {
-      const resolvedTarget = await resolveTargetImpl({
-        target: item.record.target,
-        repository,
-        token: environment.GITHUB_TOKEN,
+      const outcome = await executeApprovedReplyImpl({
+        record: item.record,
+        approvedPolishReply,
+        environment,
         fetchImpl,
+        resolveTargetImpl,
+        translateImpl,
+        findMarkerImpl,
+        publishImpl,
       });
-      const marker = approvalMarker(approvalHash(item.record.approvalId));
-      const existing = await findMarkerImpl({
-        discussionId: resolvedTarget.discussionId,
-        marker,
-        token: environment.GITHUB_TOKEN,
-        fetchImpl,
-      });
-      if (existing.found) {
+      if (outcome.kind === "already_published") {
         await movePair(mailbox, item.message.uid, message.uid, folders.processed);
         report.duplicates += 1;
         continue;
       }
-
-      if (String(resolvedTarget.sourceBody ?? "").includes(item.record.approvalId)) {
-        throw new Error("Forum source contained protected approval data");
-      }
-
-      const translation = await translateImpl({
-        sourceBody: resolvedTarget.sourceBody,
-        approvedPolishReply,
-        apiKey: environment.OPENAI_API_KEY,
-        model: environment.OPENAI_TRANSLATION_MODEL || environment.OPENAI_MODEL || DEFAULT_MODEL,
-        fetchImpl,
-      });
-      if (translation.publishedReply.includes(item.record.approvalId)) {
-        throw new Error("Translation contained protected approval data");
-      }
-      const publishedComment = await publishImpl({
-        resolvedTarget,
-        body: `${translation.publishedReply}\n\n${marker}`,
-        token: environment.GITHUB_TOKEN,
-        fetchImpl,
-      });
       await movePair(mailbox, item.message.uid, message.uid, folders.processed);
       report.published += 1;
-      try {
-        await sendConfirmationImpl({
-          outcome: {
-            kind: "published",
-            publication: {
-              discussionUrl: resolvedTarget.discussionUrl,
-              originalLanguage: translation.originalLanguage,
-              approvedPolishReply,
-              publishedReply: translation.publishedReply,
-              url: publishedComment.url,
-            },
-          },
-          environment,
-        });
-      } catch {
-        report.confirmationFailures += 1;
+      if (confirmationEmails) {
+        try {
+          await sendConfirmationImpl({ outcome, environment });
+        } catch {
+          report.confirmationFailures += 1;
+        }
       }
     } catch (error) {
       if (error?.category === "MOVE") throw error;

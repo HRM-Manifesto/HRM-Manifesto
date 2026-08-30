@@ -1,10 +1,11 @@
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyzeEntry } from "./analyze.mjs";
-import { DEFAULT_MODEL } from "./config.mjs";
+import { analyzeEntry, emptyEntryResult } from "./analyze.mjs";
+import { DEFAULT_MODEL, MAX_ENTRY_CHARS } from "./config.mjs";
 import { sendAnalysisEmail } from "./email.mjs";
 import { loadEntryFromEnvironment } from "./event.mjs";
+import { isOwnAutomationEntry } from "./notification.mjs";
 import { renderSummary } from "./summary.mjs";
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -24,18 +25,37 @@ let notificationError;
 
 try {
   entry = await loadEntryFromEnvironment();
-  analysis = await analyzeEntry({
-    entry,
-    repoRoot,
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
-  });
+  if (isOwnAutomationEntry(entry)) {
+    const body = String(entry.body ?? "");
+    analysis = {
+      result: {
+        ...emptyEntryResult(),
+        summary_pl: "Pominięto własny komentarz automatyzacji HRM.",
+      },
+      bodyInfo: {
+        body: body.slice(0, MAX_ENTRY_CHARS),
+        originalLength: body.length,
+        truncated: body.length > MAX_ENTRY_CHARS,
+      },
+      sourceChunks: [],
+      apiCalls: 0,
+      model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+    };
+    notification = { sent: false, reason: "own_automation" };
+  } else {
+    analysis = await analyzeEntry({
+      entry,
+      repoRoot,
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+    });
+  }
 } catch (error) {
   failure = error instanceof Error ? error : new Error("Unknown failure");
   process.exitCode = 1;
 }
 
-if (analysis && !failure) {
+if (analysis && !failure && !notification) {
   try {
     notification = await sendAnalysisEmail({ entry, analysis });
   } catch {

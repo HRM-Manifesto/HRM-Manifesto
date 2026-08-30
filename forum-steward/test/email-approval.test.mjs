@@ -4,10 +4,12 @@ import test from "node:test";
 import {
   APPROVAL_RECORD_BEGIN,
   APPROVAL_RECORD_END,
+  APPROVAL_RECORD_HEADER,
   approvalHash,
   approvalIsExpired,
   approvalMarker,
   createApprovalRecord,
+  encodeApprovalRecordHeader,
   readApprovalRecord,
 } from "../src/approval-record.mjs";
 import { parseDecisionMessage } from "../src/approval-parser.mjs";
@@ -153,6 +155,7 @@ test("correct APPROVE publishes the exact stored Polish proposal", async () => {
   const { report, calls, publishedBody } = await runCase({ record: created });
   assert.equal(report.published, 1);
   assert.equal(calls.publish, 1);
+  assert.equal(calls.confirmation, 0);
   assert.ok(publishedBody.startsWith("Nie zmieniaj tej propozycji."));
   assert.doesNotMatch(publishedBody, new RegExp(created.approvalId));
   assert.match(publishedBody, /<!-- hrm-approval:[a-f0-9]{64} -->/);
@@ -177,6 +180,7 @@ test("correct REJECT performs zero resolve, OpenAI, and publication calls", asyn
   const { report, calls, box } = await runCase({ decision: "reject" });
   assert.equal(report.rejected, 1);
   assert.deepEqual({ resolve: calls.resolve, translate: calls.translate, publish: calls.publish }, { resolve: 0, translate: 0, publish: 0 });
+  assert.equal(calls.confirmation, 0);
   assert.ok(box.moves.every((move) => move.folder === IMAP_FOLDERS.rejected));
 });
 
@@ -195,8 +199,17 @@ test("correct EDIT publishes exactly the text between deterministic markers", as
   const created = approval();
   const edited = "Pierwszy wiersz.\nDrugi wiersz pozostaje dokładnie taki.";
   const messages = [pendingMessage(created), decisionMessage(created, "edit", { edited })];
-  const { publishedBody } = await runCase({ record: created, messages });
+  const { calls, publishedBody } = await runCase({ record: created, messages });
   assert.ok(publishedBody.startsWith(edited));
+  assert.equal(calls.confirmation, 0);
+});
+
+test("confirmation emails remain available only behind an explicit debug flag", async () => {
+  const { report, calls } = await runCase({
+    overrides: { environment: { HRM_CONFIRMATION_EMAILS: "true" } },
+  });
+  assert.equal(report.published, 1);
+  assert.equal(calls.confirmation, 1);
 });
 
 test("EDIT with a full own reply works when the agent proposed no reply", async () => {
@@ -410,6 +423,42 @@ test("IMAP adapter creates safe folders and moves only through the mailbox abstr
   });
   assert.deepEqual(createdFolders, ["HRM", ["HRM", "Processed"], ["HRM", "Rejected"], ["HRM", "Failed"], ["HRM", "Invalid"]]);
   assert.deepEqual(moved, [{ uid: 5, folder: IMAP_FOLDERS.processed }]);
+});
+
+test("IMAP adapter reads the signed record from the invisible review email header", async () => {
+  const created = approval();
+  let fetchCalls = 0;
+  const fakeClient = {
+    usable: true,
+    namespace: { prefix: "", delimiter: "/" },
+    async connect() {},
+    async list() { return Object.values(IMAP_FOLDERS).map((path) => ({ path, delimiter: "/" })); },
+    async getMailboxLock() { return { release() {} }; },
+    async search() { return [7]; },
+    async fetchAll() {
+      fetchCalls += 1;
+      return fetchCalls === 1
+        ? [{ uid: 7, size: 2_000, envelope: { subject: "[HRM] Odpowiedź do zatwierdzenia — Threshold" } }]
+        : [{ uid: 7, source: Buffer.from("mock"), internalDate: now }];
+    },
+    async logout() {},
+  };
+  await withApprovalMailbox({
+    environment: { IMAP_HOST: "imap.example.com", IMAP_PORT: "993", IMAP_USERNAME: "user", IMAP_PASSWORD: "pass" },
+    clientFactory: () => fakeClient,
+    parser: async () => ({
+      subject: "[HRM] Odpowiedź do zatwierdzenia — Threshold",
+      text: "Krótki widoczny mail bez identyfikatorów.",
+      headers: new Map([[APPROVAL_RECORD_HEADER.toLowerCase(), encodeApprovalRecordHeader(created.block)]]),
+      from: { value: [{ address: "forum@hrm.se" }] },
+    }),
+    now,
+    handler: async (box) => {
+      assert.equal(box.messages.length, 1);
+      assert.equal(readApprovalRecord({ text: box.messages[0].approvalRecord, secret }).approvalId, created.approvalId);
+      assert.doesNotMatch(box.messages[0].text, new RegExp(created.approvalId));
+    },
+  });
 });
 
 test("IMAP network error prevents the processor handler from running", async () => {

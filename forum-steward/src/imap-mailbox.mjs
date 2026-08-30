@@ -1,5 +1,6 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import { APPROVAL_RECORD_HEADER, decodeApprovalRecordHeader } from "./approval-record.mjs";
 import { IMAP_LOOKBACK_DAYS, MAX_EMAIL_SOURCE_BYTES } from "./config.mjs";
 import { imapDiagnostic, imapStage } from "./imap-diagnostics.mjs";
 
@@ -154,7 +155,10 @@ export async function withApprovalMailbox({
         const candidates = metadata.filter((message) => {
           const subject = String(message.envelope?.subject ?? "");
           return message.size <= MAX_EMAIL_SOURCE_BYTES
-            && (subject.startsWith("[HRM Forum] Review required") || subject.startsWith("HRM "));
+            && (subject.startsWith("[HRM Forum] Review required")
+              || subject.startsWith("[HRM] Odpowiedź do zatwierdzenia")
+              || subject.startsWith("[HRM] Potrzebna Twoja decyzja")
+              || subject.startsWith("HRM "));
         });
         if (!candidates.length) return [];
         const sources = await client.fetchAll(candidates.map((message) => message.uid), { uid: true, source: true, internalDate: true }, { uid: true });
@@ -165,10 +169,20 @@ export async function withApprovalMailbox({
             skipImageLinks: true,
             maxHtmlLengthToParse: 64_000,
           });
+          let approvalRecord = "";
+          const encodedRecord = parsed.headers?.get?.(APPROVAL_RECORD_HEADER.toLowerCase());
+          if (encodedRecord) {
+            try {
+              approvalRecord = decodeApprovalRecordHeader(encodedRecord);
+            } catch {
+              approvalRecord = "invalid";
+            }
+          }
           return {
             uid: message.uid,
             subject: String(parsed.subject ?? ""),
             text: String(parsed.text ?? ""),
+            approvalRecord,
             fromAddresses: parsedAddresses(parsed.from),
             internalDate: message.internalDate ?? parsed.date ?? null,
           };

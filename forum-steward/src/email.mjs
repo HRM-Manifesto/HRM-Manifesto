@@ -1,6 +1,8 @@
 import nodemailer from "nodemailer";
 import { createApprovalRecord } from "./approval-record.mjs";
-import { escapeHtml } from "./summary.mjs";
+import { registerGatewayCase } from "./gateway-client.mjs";
+import { reviewEmailDecision } from "./notification.mjs";
+import { buildAnalysisEmail, fallbackActionLinks } from "./review-email.mjs";
 
 function singleLine(value, field) {
   const result = String(value ?? "").trim();
@@ -24,202 +26,7 @@ function fromHeader(value) {
   return result;
 }
 
-export function workflowUrlForRepository(repository) {
-  const value = String(repository ?? "");
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
-    throw new Error("Invalid GITHUB_REPOSITORY");
-  }
-  return `https://github.com/${value}/actions/workflows/hrm-publish-approved-reply.yml`;
-}
-
-function publicationTarget(entry) {
-  if (entry.nodeId) return entry.nodeId;
-  if (entry.discussionNumber) return String(entry.discussionNumber);
-  return "niedostępny w teście ręcznym";
-}
-
-function sourcesText(sources) {
-  if (!sources.length) return "brak wskazanych sekcji";
-  return sources.map((source) => (
-    `- ${source.path} — ${source.section}: ${source.relevance}`
-  )).join("\n");
-}
-
-function mailtoLink({ to, subject, body }) {
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-export function buildAnalysisEmail({ entry, analysis, recipient, repository, approval }) {
-  const result = analysis.result;
-  const to = emailAddress(recipient, "HRM_NOTIFY_EMAIL");
-  const workflowUrl = workflowUrlForRepository(repository);
-  if (!approval?.approvalId || !approval?.shortId || !approval?.block) {
-    throw new Error("Signed approval record is required");
-  }
-  const proposedPolishReply = String(approval.record?.proposedPolishReply ?? "");
-  const hasProposedReply = approval.record?.hasProposedReply === true;
-  if (hasProposedReply !== Boolean(proposedPolishReply.trim())) {
-    throw new Error("Invalid proposed reply availability");
-  }
-  const subject = `[HRM Forum] Review required — ${approval.shortId}`;
-  const original = analysis.bodyInfo.body || "(pusty wpis)";
-  const truncation = analysis.bodyInfo.truncated
-    ? `\n\n[UWAGA: wpis skrócono do ${analysis.bodyInfo.body.length} znaków z ${analysis.bodyInfo.originalLength}.]`
-    : "";
-
-  const approveSubject = `HRM APPROVE ${approval.approvalId}`;
-  const rejectSubject = `HRM REJECT ${approval.approvalId}`;
-  const editSubject = `HRM EDIT ${approval.approvalId}`;
-  const approveLink = hasProposedReply
-    ? mailtoLink({ to, subject: approveSubject, body: "ZATWIERDZAM" })
-    : "";
-  const rejectLink = mailtoLink({ to, subject: rejectSubject, body: "NIE ODPOWIADAJ" });
-  const finalInstructions = hasProposedReply
-    ? "Aby ją opublikować, wyślij jedną z powyższych decyzji albo awaryjnie uruchom ręcznie workflow HRM Publish Approved Reply."
-    : "Agent nie przygotował propozycji do zatwierdzenia. Możesz wybrać NIE ODPOWIADAJ albo ręcznie wysłać pełną własną odpowiedź komendą EDIT.";
-
-  const decisionText = hasProposedReply
-    ? `ZATWIERDŹ
-Wyślij nową wiadomość:
-To: ${to}
-Subject: ${approveSubject}
-Body: ZATWIERDZAM
-
-NIE ODPOWIADAJ
-Wyślij nową wiadomość:
-To: ${to}
-Subject: ${rejectSubject}
-Body: NIE ODPOWIADAJ
-
-POPRAW ODPOWIEDŹ
-Odpowiedz nową wiadomością w dokładnym formacie:
-To: ${to}
-Subject: ${editSubject}
-Body:
-POPRAWIAM
----ODPOWIEDŹ---
-[tutaj pełna poprawiona odpowiedź po polsku]
----KONIEC---`
-    : `Agent nie proponuje odpowiedzi na ten wpis.
-
-NIE ODPOWIADAJ
-Wyślij nową wiadomość:
-To: ${to}
-Subject: ${rejectSubject}
-Body: NIE ODPOWIADAJ
-
-NAPISZ WŁASNĄ ODPOWIEDŹ
-Możesz ręcznie przygotować pełną polską odpowiedź Aleksandra i wysłać nową wiadomość w dokładnym formacie:
-To: ${to}
-Subject: ${editSubject}
-Body:
-POPRAWIAM
----ODPOWIEDŹ---
-[tutaj pełna własna odpowiedź po polsku]
----KONIEC---
-
-Nic nie zostanie opublikowane bez wysłania przez Aleksandra tej wiadomości.`;
-
-  const text = `HRM FORUM STEWARD
-
-Ta analiza służy wyłącznie do ręcznej oceny. Nic nie zostało opublikowane.
-
-DECYZJA ALEKSANDRA
-
-${decisionText}
-
-Samo kliknięcie linku w wersji HTML niczego nie publikuje. Zawsze trzeba nacisnąć Wyślij.
-
-Link do dyskusji:
-${entry.url || entry.discussionUrl || "brak linku (test ręczny)"}
-
-Target do workflow publikującego:
-${publicationTarget(entry)}
-
-Autor:
-${entry.author || "nieznany"}
-
-Język oryginału:
-${result.original_language}
-
-ORYGINAŁ:
-${original}${truncation}
-
-TŁUMACZENIE POLSKIE:
-${result.polish_translation || "(brak — pusty wpis)"}
-
-STRESZCZENIE:
-${result.summary_pl}
-
-RODZAJ:
-${result.entry_type}
-
-WAŻNOŚĆ:
-${result.priority}
-
-CZY WYMAGA ALEKSANDRA:
-${result.requires_aleksander_response ? "tak" : "nie"}
-
-ŹRÓDŁA HRM:
-${sourcesText(result.relevant_sources)}
-
-OPARCIE ODPOWIEDZI:
-${result.support_level}
-
-NOWE STANOWISKO ALEKSANDRA:
-${result.requires_new_position ? "tak" : "nie"}
-
-INTERPRETATION WARNING:
-${result.interpretation_warning ? "tak" : "nie"}
-${result.interpretation_warning_reason || ""}
-
-PROPOZYCJA ODPOWIEDZI PO POLSKU:
-${hasProposedReply ? proposedPolishReply : "(brak propozycji)"}
-
-Ta odpowiedź NIE została opublikowana.
-${finalInstructions}
-
-Awaryjny workflow publikujący:
-${workflowUrl}
-
-DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:
-${approval.block}
-`;
-
-  const decisionHtml = hasProposedReply
-    ? `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
-<h2>DECYZJA ALEKSANDRA</h2>
-<p><a href="${escapeHtml(approveLink)}" style="display:inline-block;padding:10px 16px;background:#1f6f50;color:#fff;text-decoration:none">ZATWIERDŹ</a></p>
-<p><a href="${escapeHtml(rejectLink)}" style="display:inline-block;padding:10px 16px;background:#7a2430;color:#fff;text-decoration:none">NIE ODPOWIADAJ</a></p>
-<h3>POPRAW ODPOWIEDŹ</h3>
-<p>Wyślij nową wiadomość do <strong>${escapeHtml(to)}</strong> z tematem:</p>
-<pre>${escapeHtml(editSubject)}</pre>
-<p>i treścią:</p>
-<pre>POPRAWIAM
----ODPOWIEDŹ---
-[tutaj pełna poprawiona odpowiedź po polsku]
----KONIEC---</pre>
-<p><strong>Samo kliknięcie przycisku niczego nie publikuje. Trzeba jeszcze wysłać przygotowaną wiadomość.</strong></p>
-</section>`
-    : `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
-<h2>DECYZJA ALEKSANDRA</h2>
-<p><strong>Agent nie proponuje odpowiedzi na ten wpis.</strong></p>
-<p><a href="${escapeHtml(rejectLink)}" style="display:inline-block;padding:10px 16px;background:#7a2430;color:#fff;text-decoration:none">NIE ODPOWIADAJ</a></p>
-<h3>NAPISZ WŁASNĄ ODPOWIEDŹ</h3>
-<p>Ręcznie przygotuj pełną polską odpowiedź Aleksandra i wyślij nową wiadomość do <strong>${escapeHtml(to)}</strong> z tematem:</p>
-<pre>${escapeHtml(editSubject)}</pre>
-<p>i treścią:</p>
-<pre>POPRAWIAM
----ODPOWIEDŹ---
-[tutaj pełna własna odpowiedź po polsku]
----KONIEC---</pre>
-<p><strong>Nic nie zostanie opublikowane bez wysłania przez Aleksandra tej wiadomości.</strong></p>
-</section>`;
-  const visibleText = text.split("DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:")[0];
-  const html = `<!doctype html><html><body><h1>HRM FORUM STEWARD</h1>${decisionHtml}<pre style="white-space:pre-wrap">${escapeHtml(visibleText)}</pre></body></html>`;
-
-  return { to, subject, text, html };
-}
+export { buildAnalysisEmail } from "./review-email.mjs";
 
 export function smtpConfigFromEnvironment(environment) {
   const host = singleLine(environment.SMTP_HOST, "SMTP_HOST");
@@ -253,12 +60,15 @@ export async function sendAnalysisEmail({
   environment = process.env,
   transportFactory = nodemailer.createTransport,
   createApprovalImpl = createApprovalRecord,
+  registerGatewayImpl = registerGatewayCase,
   now = new Date(),
   randomBytesImpl,
 }) {
   if (String(environment.HRM_EMAIL_ENABLED ?? "true").toLowerCase() === "false") {
     return { sent: false, reason: "disabled" };
   }
+  const decision = reviewEmailDecision({ entry, analysis, environment });
+  if (!decision.send) return { sent: false, reason: decision.reason };
   const { from, transport } = smtpConfigFromEnvironment(environment);
   const approval = createApprovalImpl({
     entry,
@@ -268,12 +78,21 @@ export async function sendAnalysisEmail({
     now,
     randomBytesImpl,
   });
+  const gateway = await registerGatewayImpl({ entry, approval, environment });
+  if (gateway?.created === false) return { sent: false, reason: "duplicate" };
+  const actionLinks = gateway?.created
+    ? { mode: "gateway", ...gateway.links }
+    : fallbackActionLinks({
+      to: environment.HRM_NOTIFY_EMAIL,
+      approval,
+      hasProposedReply: approval.record.hasProposedReply,
+    });
   const message = buildAnalysisEmail({
     entry,
     analysis,
     recipient: environment.HRM_NOTIFY_EMAIL,
-    repository: environment.GITHUB_REPOSITORY,
     approval,
+    actionLinks,
   });
   const transporter = transportFactory(transport);
   await transporter.sendMail({ from, ...message });

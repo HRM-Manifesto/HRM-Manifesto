@@ -3,6 +3,7 @@ import { APPROVAL_TTL_MS, MAX_APPROVED_REPLY_CHARS, MAX_TARGET_CHARS } from "./c
 
 export const APPROVAL_RECORD_BEGIN = "-----BEGIN HRM APPROVAL RECORD-----";
 export const APPROVAL_RECORD_END = "-----END HRM APPROVAL RECORD-----";
+export const APPROVAL_RECORD_HEADER = "X-HRM-Approval-Record";
 
 function signingKey(secret) {
   const value = String(secret ?? "");
@@ -123,6 +124,24 @@ export function readApprovalRecord({ text, secret }) {
     throw new Error("Invalid approval record encoding");
   }
   return validateRecord(record);
+}
+
+export function encodeApprovalRecordHeader(block) {
+  const value = String(block ?? "");
+  if (!value.includes(APPROVAL_RECORD_BEGIN) || !value.includes(APPROVAL_RECORD_END)) {
+    throw new Error("Invalid approval record block");
+  }
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+export function decodeApprovalRecordHeader(value) {
+  const encoded = String(value ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{100,}$/.test(encoded)) throw new Error("Invalid approval record header");
+  const block = Buffer.from(encoded, "base64url").toString("utf8");
+  if (!block.includes(APPROVAL_RECORD_BEGIN) || !block.includes(APPROVAL_RECORD_END)) {
+    throw new Error("Invalid approval record header");
+  }
+  return block;
 }
 
 export function approvalIsExpired(record, now = new Date()) {

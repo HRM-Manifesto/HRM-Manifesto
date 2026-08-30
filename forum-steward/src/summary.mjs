@@ -29,7 +29,7 @@ export function renderSummary({ entry, analysis, error = null, notification = nu
   const entryUrl = safeUrl(entry.url);
   const entryLabel = entryUrl ? `[Open forum entry](${entryUrl})` : "Manual test or URL unavailable";
   const lines = [
-    "# HRM Forum Steward v2.1 — analiza nieopublikowana",
+    "# HRM Forum Steward v2.2 — analiza nieopublikowana",
     "",
     "> **READ / ANALYZE / PROPOSE only. Nic nie zostało opublikowane w GitHub Discussions.**",
     "",
@@ -116,7 +116,11 @@ export function renderSummary({ entry, analysis, error = null, notification = nu
       ? `Błąd wysyłki: ${escapeMarkdown(notificationError.message || "nieznany błąd")}`
       : notification?.sent
         ? "Wysłano."
-        : "Nie wysłano — powiadomienia są wyłączone.",
+        : notification?.reason === "disabled"
+          ? "Nie wysłano — powiadomienia są wyłączone."
+          : notification?.reason === "duplicate"
+            ? "Nie wysłano — ten event ma już trwały klucz powiadomienia."
+            : "Nie wysłano — sprawa nie wymaga decyzji Aleksandra.",
     "",
   );
 

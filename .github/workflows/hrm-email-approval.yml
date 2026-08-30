@@ -33,6 +33,7 @@ jobs:
           OPENAI_TRANSLATION_MODEL: ${{ vars.OPENAI_TRANSLATION_MODEL || vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
           HRM_NOTIFY_EMAIL: ${{ vars.HRM_NOTIFY_EMAIL }}
           HRM_APPROVAL_SECRET: ${{ secrets.HRM_APPROVAL_SECRET }}
+          HRM_CONFIRMATION_EMAILS: ${{ vars.HRM_CONFIRMATION_EMAILS || 'false' }}
           IMAP_HOST: ${{ secrets.IMAP_HOST }}
           IMAP_PORT: ${{ secrets.IMAP_PORT }}
           IMAP_USERNAME: ${{ secrets.IMAP_USERNAME }}

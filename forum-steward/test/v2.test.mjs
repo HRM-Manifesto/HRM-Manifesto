@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildAnalysisEmail, buildDecisionConfirmationEmail, sendAnalysisEmail } from "../src/email.mjs";
-import { createApprovalRecord } from "../src/approval-record.mjs";
+import { APPROVAL_RECORD_HEADER, createApprovalRecord } from "../src/approval-record.mjs";
 import { parseTarget } from "../src/github-discussions.mjs";
 import { runPublishApprovedReply } from "../src/publish.mjs";
 import { renderPublishSummary } from "../src/publish-summary.mjs";
@@ -76,6 +76,16 @@ function approvalFixture(entry = entryFixture(), analysis = analysisFixture()) {
   });
 }
 
+function gatewayActionLinks() {
+  const token = Buffer.alloc(32, 5).toString("base64url");
+  return {
+    mode: "gateway",
+    approve: `https://approve.hrm.se/a/approve/${token}`,
+    edit: `https://approve.hrm.se/a/edit/${token}`,
+    reject: `https://approve.hrm.se/a/reject/${token}`,
+  };
+}
+
 function openAiFetch(result, observed = { calls: 0 }) {
   return async (_url, options) => {
     observed.calls += 1;
@@ -111,18 +121,16 @@ test("analysis email contains all required Polish review fields", () => {
     recipient: "manifest@example.com",
     repository: "HRM-Manifesto/HRM-Manifesto",
     approval: approvalFixture(entry, analysis),
+    actionLinks: gatewayActionLinks(),
   });
   for (const label of [
-    "Link do dyskusji:", "Autor:", "Język oryginału:", "ORYGINAŁ:",
-    "TŁUMACZENIE POLSKIE:", "STRESZCZENIE:", "RODZAJ:", "WAŻNOŚĆ:",
-    "CZY WYMAGA ALEKSANDRA:", "ŹRÓDŁA HRM:", "INTERPRETATION WARNING:",
-    "PROPOZYCJA ODPOWIEDZI PO POLSKU:", "Ta odpowiedź NIE została opublikowana.",
-    "DECYZJA ALEKSANDRA", "ZATWIERDŹ", "NIE ODPOWIADAJ", "POPRAW ODPOWIEDŹ",
+    "HRM", "Odpowiedź do zatwierdzenia", "NAPISAŁ:",
+    "PROPONOWANA ODPOWIEDŹ:", "ZATWIERDŹ I OPUBLIKUJ", "NIE ODPOWIADAJ", "POPRAW",
   ]) assert.match(message.text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(message.text, /hrm-publish-approved-reply\.yml/);
   assert.equal(message.to, "manifest@example.com");
   assert.equal(approvalFixture(entry, analysis).record.hasProposedReply, true);
-  assert.match(message.html, /ZATWIERDŹ/);
+  assert.match(message.html, /ZATWIERDŹ I OPUBLIKUJ/);
+  assert.ok(message.headers[APPROVAL_RECORD_HEADER]);
 });
 
 test("analysis email without a proposal omits APPROVE and offers only reject or a manual own reply", () => {
@@ -139,14 +147,15 @@ test("analysis email without a proposal omits APPROVE and offers only reject or 
     recipient: "manifest@example.com",
     repository: "HRM-Manifesto/HRM-Manifesto",
     approval,
+    actionLinks: gatewayActionLinks(),
   });
 
   assert.equal(approval.record.hasProposedReply, false);
   for (const content of [message.text, message.html]) {
-    assert.match(content, /Agent nie proponuje odpowiedzi na ten wpis\./);
+    assert.match(content, /Agent nie proponuje gotowej odpowiedzi\./);
     assert.match(content, /NIE ODPOWIADAJ/);
-    assert.match(content, /NAPISZ WŁASNĄ ODPOWIEDŹ/);
-    assert.doesNotMatch(content, /ZATWIERDŹ|POPRAW ODPOWIEDŹ|HRM(?:%20| )APPROVE/);
+    assert.match(content, /NAPISZ ODPOWIEDŹ/);
+    assert.doesNotMatch(content, /ZATWIERDŹ|HRM(?:%20| )APPROVE/);
   }
 });
 
@@ -178,26 +187,28 @@ test("SMTP secrets are configuration only and never enter email content", async 
   assert.equal(captured.config.secure, true);
   assert.doesNotMatch(captured.message.text, /smtp-password-secret|smtp-user-secret|test-approval-secret/);
   assert.doesNotMatch(captured.message.subject, /smtp-password-secret|smtp-user-secret|test-approval-secret/);
-  assert.match(captured.message.subject, /Review required — 080808080808$/);
-  assert.doesNotMatch(captured.message.subject, /08080808080808080808/);
+  assert.match(captured.message.subject, /^\[HRM\] Odpowiedź do zatwierdzenia — /);
+  assert.doesNotMatch(captured.message.subject, /080808080808/);
 });
 
 test("forum HTML and Markdown remain inert plain text in email", () => {
   const entry = entryFixture({ body: "<script>alert(1)</script> ![track](https://evil.invalid/x)" });
   const analysis = analysisFixture();
   analysis.bodyInfo.body = entry.body;
+  analysis.result.polish_translation = entry.body;
   const message = buildAnalysisEmail({
     entry,
     analysis,
     recipient: "manifest@example.com",
     repository: "HRM-Manifesto/HRM-Manifesto",
     approval: approvalFixture(entry, analysis),
+    actionLinks: gatewayActionLinks(),
   });
   assert.match(message.text, /<script>alert\(1\)<\/script>/);
   assert.match(message.text, /!\[track\]/);
   assert.doesNotMatch(message.html, /<script>alert\(1\)<\/script>/);
   assert.match(message.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.match(message.html, /mailto:/);
+  assert.match(message.html, /https:\/\/approve\.hrm\.se\/a\/approve\//);
 });
 
 test("email can be disabled without requiring SMTP secrets", async () => {
