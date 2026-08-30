@@ -7,6 +7,11 @@ import { analyzeEntry, STEWARD_INSTRUCTIONS } from "../src/analyze.mjs";
 import { MAX_ENTRY_CHARS, MAX_SOURCE_CHARS } from "../src/config.mjs";
 import { entryFromEvent } from "../src/event.mjs";
 import { renderSummary } from "../src/summary.mjs";
+import {
+  formatSourceContext,
+  loadOfficialChunks,
+  selectRelevantChunks,
+} from "../src/sources.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDirectory, "../..");
@@ -87,6 +92,75 @@ test("ordinary English question uses one Responses API call", async () => {
   assert.equal(analysis.result.entry_type, "question");
   assert.equal(analysis.result.language, "en");
   assert.equal(analysis.result.relevant_sources.length, 1);
+});
+
+test("canonical present-day AI rule cannot be displaced by retrieval ranking", async () => {
+  const question = "Does HRM consider every present-day artificial intelligence system to already be a subject with rights?";
+  const expectedReply = "No. HRM does not assume that every contemporary AI system is automatically a subject. Rights described by HRM concern an AI subject once the Threshold of Subjecthood is crossed.";
+  const observed = { calls: 0 };
+  const modelResult = (request) => {
+    assert.match(request.instructions, /Check every excerpt marked CANONICAL CORE SOURCE/);
+    const coreStart = request.input.indexOf("CANONICAL CORE SOURCE 1");
+    const dynamicStart = request.input.indexOf("DYNAMICALLY SELECTED SOURCE 1");
+    assert.ok(coreStart >= 0, "canonical sources must be explicitly marked");
+    assert.ok(dynamicStart < 0 || coreStart < dynamicStart, "canonical sources must precede ranked sources");
+    assert.match(
+      request.input,
+      /HRM does not assume that every contemporary AI system is automatically a subject\./,
+    );
+    assert.match(
+      request.input,
+      /The \*\*Threshold of Subjecthood\*\* describes the boundary at which an informational entity ceases to be merely a tool/,
+    );
+    assert.match(request.input, /Never turn a subject into a thing\./);
+    assert.match(
+      request.input,
+      /defines rights that should protect a future AI subject if that threshold is crossed\./,
+    );
+    return result({
+      relevant_sources: [{
+        path: "README.md",
+        section: "What is HRM?",
+        relevance: "It directly distinguishes present-day AI systems from AI subjects that cross the threshold.",
+      }],
+      proposed_reply: expectedReply,
+      confidence: 0.99,
+      interpretation_warning: false,
+      interpretation_warning_reason: "",
+    });
+  };
+
+  const analysis = await analyzeEntry({
+    entry: {
+      eventType: "discussion",
+      title: "Present-day AI and subjecthood",
+      body: question,
+      author: "tester",
+      url: "",
+      category: "Q&A",
+    },
+    repoRoot,
+    apiKey: "test-key-not-a-secret",
+    model: "test-model",
+    fetchImpl: fakeFetchFor(modelResult, observed),
+  });
+
+  assert.equal(observed.calls, 1);
+  assert.equal(analysis.result.proposed_reply, expectedReply);
+  assert.equal(analysis.result.requires_aleksander_response, false);
+  assert.equal(analysis.result.interpretation_warning, false);
+  assert.equal(analysis.sourceChunks[0].path, "README.md");
+  assert.equal(analysis.sourceChunks[0].heading, "Core principle");
+  assert.equal(analysis.sourceChunks[1].path, "README.md");
+  assert.equal(analysis.sourceChunks[1].heading, "What is HRM?");
+});
+
+test("canonical core and ranked excerpts share the existing source limits", async () => {
+  const chunks = await loadOfficialChunks(repoRoot);
+  const selected = selectRelevantChunks(chunks, "rights consent responsibility threshold");
+  assert.ok(selected.length <= 6);
+  assert.ok(formatSourceContext(selected).length <= MAX_SOURCE_CHARS);
+  assert.equal(selected.filter((chunk) => chunk.core).length, 2);
 });
 
 test("criticism is preserved as a criticism result", async () => {

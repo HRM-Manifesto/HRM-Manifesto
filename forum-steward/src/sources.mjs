@@ -17,6 +17,13 @@ const OFFICIAL_SOURCE_PATHS = [
   "machine-readable/manifest.json",
 ];
 
+// These selectors identify official sections; the facts themselves remain only
+// in the repository source files and are never duplicated in application code.
+const CORE_SOURCE_SECTIONS = [
+  { path: "README.md", heading: "Core principle" },
+  { path: "README.md", heading: "What is HRM?" },
+];
+
 const STOP_WORDS = new Set([
   "about", "after", "again", "also", "and", "are", "czy", "dla", "from",
   "have", "how", "jak", "jest", "jako", "lub", "nie", "oraz", "should",
@@ -106,6 +113,24 @@ export function selectRelevantChunks(chunks, query, options = {}) {
   const maxChars = options.maxChars ?? MAX_SOURCE_CHARS;
   const queryTokens = tokens(query);
 
+  const coreChunks = CORE_SOURCE_SECTIONS.map((required) => {
+    const chunk = chunks.find((candidate) => (
+      candidate.path === required.path && candidate.heading === required.heading
+    ));
+    if (!chunk) {
+      throw new Error(`Required canonical HRM section is missing: ${required.path}#${required.heading}`);
+    }
+    return { ...chunk, score: Number.POSITIVE_INFINITY, core: true };
+  });
+
+  if (coreChunks.length > maxChunks) {
+    throw new Error("Source chunk limit is too small for canonical HRM sections");
+  }
+  if (formatSourceContext(coreChunks).length > maxChars) {
+    throw new Error("Source character limit is too small for canonical HRM sections");
+  }
+
+  const coreKeys = new Set(coreChunks.map((chunk) => `${chunk.path}\n${chunk.heading}`));
   const ranked = chunks.map((chunk, index) => {
     const headingTokens = tokens(chunk.heading);
     const contentTokens = tokens(chunk.content);
@@ -116,9 +141,10 @@ export function selectRelevantChunks(chunks, query, options = {}) {
     }
     if (chunk.path === "README.md") score += 0.25;
     return { ...chunk, score, index };
-  }).sort((a, b) => b.score - a.score || a.index - b.index);
+  }).filter((chunk) => !coreKeys.has(`${chunk.path}\n${chunk.heading}`))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  const selected = [];
+  const selected = [...coreChunks];
   for (const chunk of ranked) {
     if (selected.length >= maxChunks) break;
     const clippedContent = chunk.content.slice(0, 2_200);
@@ -135,12 +161,16 @@ export function selectRelevantChunks(chunks, query, options = {}) {
 }
 
 export function formatSourceContext(chunks) {
-  return chunks.map((chunk, index) => [
-    `SOURCE ${index + 1}`,
+  let coreIndex = 0;
+  let rankedIndex = 0;
+  return chunks.map((chunk) => [
+    chunk.core
+      ? `CANONICAL CORE SOURCE ${coreIndex += 1}`
+      : `DYNAMICALLY SELECTED SOURCE ${rankedIndex += 1}`,
     `Path: ${chunk.path}`,
     `Section: ${chunk.heading}`,
     chunk.content,
   ].join("\n")).join("\n\n---\n\n");
 }
 
-export { OFFICIAL_SOURCE_PATHS };
+export { CORE_SOURCE_SECTIONS, OFFICIAL_SOURCE_PATHS };

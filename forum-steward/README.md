@@ -18,7 +18,7 @@ The assistant uses only selected excerpts from:
 - `machine-readable/`
 - `README.md`
 
-The forum entry is limited to 8,000 characters. Source selection is local and deterministic; at most 12,000 characters of relevant official excerpts are sent to the model. A non-empty entry causes at most one OpenAI API request. An empty entry causes no API request.
+The forum entry is limited to 8,000 characters. Source selection is local and deterministic. Two small canonical sections from the official `README.md` (`Core principle` and `What is HRM?`) are always included before dynamically ranked excerpts, so foundational HRM rules cannot be displaced by ranking. At most 12,000 characters and 6 official source chunks in total are sent to the model. A non-empty entry causes at most one OpenAI API request. An empty entry causes no API request.
 
 ## What it does not do
 
@@ -64,4 +64,4 @@ cd forum-steward
 npm test
 ```
 
-The tests cover an ordinary question, criticism, Polish and English entries, prompt injection, spam, an empty entry, a very long entry, event parsing, output escaping, and workflow permissions.
+The tests cover an ordinary question, the canonical present-day-AI regression, criticism, Polish and English entries, prompt injection, spam, an empty entry, a very long entry, event parsing, output escaping, and workflow permissions.
