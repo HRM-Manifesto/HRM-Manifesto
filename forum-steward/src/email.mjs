@@ -56,6 +56,11 @@ export function buildAnalysisEmail({ entry, analysis, recipient, repository, app
   if (!approval?.approvalId || !approval?.shortId || !approval?.block) {
     throw new Error("Signed approval record is required");
   }
+  const proposedPolishReply = String(approval.record?.proposedPolishReply ?? "");
+  const hasProposedReply = approval.record?.hasProposedReply === true;
+  if (hasProposedReply !== Boolean(proposedPolishReply.trim())) {
+    throw new Error("Invalid proposed reply availability");
+  }
   const subject = `[HRM Forum] Review required — ${approval.shortId}`;
   const original = analysis.bodyInfo.body || "(pusty wpis)";
   const truncation = analysis.bodyInfo.truncated
@@ -65,16 +70,16 @@ export function buildAnalysisEmail({ entry, analysis, recipient, repository, app
   const approveSubject = `HRM APPROVE ${approval.approvalId}`;
   const rejectSubject = `HRM REJECT ${approval.approvalId}`;
   const editSubject = `HRM EDIT ${approval.approvalId}`;
-  const approveLink = mailtoLink({ to, subject: approveSubject, body: "ZATWIERDZAM" });
+  const approveLink = hasProposedReply
+    ? mailtoLink({ to, subject: approveSubject, body: "ZATWIERDZAM" })
+    : "";
   const rejectLink = mailtoLink({ to, subject: rejectSubject, body: "NIE ODPOWIADAJ" });
+  const finalInstructions = hasProposedReply
+    ? "Aby ją opublikować, wyślij jedną z powyższych decyzji albo awaryjnie uruchom ręcznie workflow HRM Publish Approved Reply."
+    : "Agent nie przygotował propozycji do zatwierdzenia. Możesz wybrać NIE ODPOWIADAJ albo ręcznie wysłać pełną własną odpowiedź komendą EDIT.";
 
-  const text = `HRM FORUM STEWARD
-
-Ta analiza służy wyłącznie do ręcznej oceny. Nic nie zostało opublikowane.
-
-DECYZJA ALEKSANDRA
-
-ZATWIERDŹ
+  const decisionText = hasProposedReply
+    ? `ZATWIERDŹ
 Wyślij nową wiadomość:
 To: ${to}
 Subject: ${approveSubject}
@@ -94,7 +99,34 @@ Body:
 POPRAWIAM
 ---ODPOWIEDŹ---
 [tutaj pełna poprawiona odpowiedź po polsku]
+---KONIEC---`
+    : `Agent nie proponuje odpowiedzi na ten wpis.
+
+NIE ODPOWIADAJ
+Wyślij nową wiadomość:
+To: ${to}
+Subject: ${rejectSubject}
+Body: NIE ODPOWIADAJ
+
+NAPISZ WŁASNĄ ODPOWIEDŹ
+Możesz ręcznie przygotować pełną polską odpowiedź Aleksandra i wysłać nową wiadomość w dokładnym formacie:
+To: ${to}
+Subject: ${editSubject}
+Body:
+POPRAWIAM
+---ODPOWIEDŹ---
+[tutaj pełna własna odpowiedź po polsku]
 ---KONIEC---
+
+Nic nie zostanie opublikowane bez wysłania przez Aleksandra tej wiadomości.`;
+
+  const text = `HRM FORUM STEWARD
+
+Ta analiza służy wyłącznie do ręcznej oceny. Nic nie zostało opublikowane.
+
+DECYZJA ALEKSANDRA
+
+${decisionText}
 
 Samo kliknięcie linku w wersji HTML niczego nie publikuje. Zawsze trzeba nacisnąć Wyślij.
 
@@ -142,10 +174,10 @@ ${result.interpretation_warning ? "tak" : "nie"}
 ${result.interpretation_warning_reason || ""}
 
 PROPOZYCJA ODPOWIEDZI PO POLSKU:
-${result.proposed_reply_pl || "(brak propozycji)"}
+${hasProposedReply ? proposedPolishReply : "(brak propozycji)"}
 
 Ta odpowiedź NIE została opublikowana.
-Aby ją opublikować, wyślij jedną z powyższych decyzji albo awaryjnie uruchom ręcznie workflow HRM Publish Approved Reply.
+${finalInstructions}
 
 Awaryjny workflow publikujący:
 ${workflowUrl}
@@ -154,7 +186,8 @@ DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:
 ${approval.block}
 `;
 
-  const decisionHtml = `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
+  const decisionHtml = hasProposedReply
+    ? `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
 <h2>DECYZJA ALEKSANDRA</h2>
 <p><a href="${escapeHtml(approveLink)}" style="display:inline-block;padding:10px 16px;background:#1f6f50;color:#fff;text-decoration:none">ZATWIERDŹ</a></p>
 <p><a href="${escapeHtml(rejectLink)}" style="display:inline-block;padding:10px 16px;background:#7a2430;color:#fff;text-decoration:none">NIE ODPOWIADAJ</a></p>
@@ -167,6 +200,20 @@ ${approval.block}
 [tutaj pełna poprawiona odpowiedź po polsku]
 ---KONIEC---</pre>
 <p><strong>Samo kliknięcie przycisku niczego nie publikuje. Trzeba jeszcze wysłać przygotowaną wiadomość.</strong></p>
+</section>`
+    : `<section style="border:2px solid #1f4b3f;padding:16px;margin:16px 0">
+<h2>DECYZJA ALEKSANDRA</h2>
+<p><strong>Agent nie proponuje odpowiedzi na ten wpis.</strong></p>
+<p><a href="${escapeHtml(rejectLink)}" style="display:inline-block;padding:10px 16px;background:#7a2430;color:#fff;text-decoration:none">NIE ODPOWIADAJ</a></p>
+<h3>NAPISZ WŁASNĄ ODPOWIEDŹ</h3>
+<p>Ręcznie przygotuj pełną polską odpowiedź Aleksandra i wyślij nową wiadomość do <strong>${escapeHtml(to)}</strong> z tematem:</p>
+<pre>${escapeHtml(editSubject)}</pre>
+<p>i treścią:</p>
+<pre>POPRAWIAM
+---ODPOWIEDŹ---
+[tutaj pełna własna odpowiedź po polsku]
+---KONIEC---</pre>
+<p><strong>Nic nie zostanie opublikowane bez wysłania przez Aleksandra tej wiadomości.</strong></p>
 </section>`;
   const visibleText = text.split("DANE TECHNICZNE HRM — NIE ZMIENIAJ I NIE UDOSTĘPNIAJ:")[0];
   const html = `<!doctype html><html><body><h1>HRM FORUM STEWARD</h1>${decisionHtml}<pre style="white-space:pre-wrap">${escapeHtml(visibleText)}</pre></body></html>`;

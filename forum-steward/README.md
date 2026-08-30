@@ -44,6 +44,7 @@ Rekord oczekującej sprawy jest podpisany HMAC przy użyciu sekretu `HRM_APPROVA
    - klikasz **ZATWIERDŹ**, a następnie naciskasz **Wyślij** w przygotowanej wiadomości;
    - klikasz **NIE ODPOWIADAJ**, a następnie naciskasz **Wyślij**;
    - tworzysz wiadomość `HRM EDIT ...` i umieszczasz poprawioną odpowiedź między znacznikami.
+   Jeżeli podpisany rekord ma `hasProposedReply: false`, e-mail nie pokazuje **ZATWIERDŹ** ani opcji poprawiania istniejącej propozycji. Pozostawia **NIE ODPOWIADAJ** oraz ręczną instrukcję **NAPISZ WŁASNĄ ODPOWIEDŹ** przez `EDIT`.
 4. Samo kliknięcie linku `mailto:` niczego nie publikuje.
 5. Procesor IMAP wykonuje resztę po otrzymaniu prawidłowej wiadomości.
 

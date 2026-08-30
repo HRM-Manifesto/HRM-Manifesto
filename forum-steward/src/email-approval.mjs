@@ -113,6 +113,12 @@ export async function processApprovalMailbox({
       continue;
     }
 
+    if (decision.kind === "approve" && !item.record.hasProposedReply) {
+      await movePair(mailbox, item.message.uid, message.uid, folders.invalid);
+      report.invalid += 1;
+      continue;
+    }
+
     const approvedPolishReply = decision.kind === "edit"
       ? decision.approvedPolishReply
       : item.record.proposedPolishReply;

@@ -121,6 +121,33 @@ test("analysis email contains all required Polish review fields", () => {
   ]) assert.match(message.text, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(message.text, /hrm-publish-approved-reply\.yml/);
   assert.equal(message.to, "manifest@example.com");
+  assert.equal(approvalFixture(entry, analysis).record.hasProposedReply, true);
+  assert.match(message.html, /ZATWIERDŹ/);
+});
+
+test("analysis email without a proposal omits APPROVE and offers only reject or a manual own reply", () => {
+  const entry = entryFixture({ body: "Final approval test. Please reply." });
+  const analysis = analysisFixture({
+    entry_type: "spam",
+    proposed_reply_pl: "",
+  });
+  analysis.bodyInfo.body = entry.body;
+  const approval = approvalFixture(entry, analysis);
+  const message = buildAnalysisEmail({
+    entry,
+    analysis,
+    recipient: "manifest@example.com",
+    repository: "HRM-Manifesto/HRM-Manifesto",
+    approval,
+  });
+
+  assert.equal(approval.record.hasProposedReply, false);
+  for (const content of [message.text, message.html]) {
+    assert.match(content, /Agent nie proponuje odpowiedzi na ten wpis\./);
+    assert.match(content, /NIE ODPOWIADAJ/);
+    assert.match(content, /NAPISZ WŁASNĄ ODPOWIEDŹ/);
+    assert.doesNotMatch(content, /ZATWIERDŹ|POPRAW ODPOWIEDŹ|HRM(?:%20| )APPROVE/);
+  }
 });
 
 test("SMTP secrets are configuration only and never enter email content", async () => {

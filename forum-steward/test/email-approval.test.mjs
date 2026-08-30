@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import test from "node:test";
 import {
+  APPROVAL_RECORD_BEGIN,
+  APPROVAL_RECORD_END,
   approvalHash,
   approvalIsExpired,
   approvalMarker,
@@ -43,6 +46,22 @@ function approval(overrides = {}) {
     now: overrides.now ?? now,
     randomBytesImpl: () => Buffer.alloc(32, overrides.byte ?? 3),
   });
+}
+
+function legacyApproval(overrides = {}) {
+  const current = approval(overrides);
+  const { hasProposedReply: _hasProposedReply, ...record } = current.record;
+  record.v = 1;
+  const payload = Buffer.from(JSON.stringify(record), "utf8").toString("base64url");
+  const signature = createHmac("sha256", secret).update(payload, "utf8").digest("hex");
+  return {
+    ...current,
+    record: readApprovalRecord({
+      text: `${APPROVAL_RECORD_BEGIN}\n${payload}\n${signature}\n${APPROVAL_RECORD_END}`,
+      secret,
+    }),
+    block: `${APPROVAL_RECORD_BEGIN}\n${payload}\n${signature}\n${APPROVAL_RECORD_END}`,
+  };
 }
 
 function pendingMessage(record = approval(), uid = 10) {
@@ -124,6 +143,11 @@ test("Approval ID has 256-bit local entropy, a valid signature, and a 14-day exp
   assert.throws(() => readApprovalRecord({ text: created.block.replace(/.$/s, "X"), secret }));
 });
 
+test("signed version 1 pending records derive proposal availability from their signed reply", () => {
+  assert.equal(legacyApproval().record.hasProposedReply, true);
+  assert.equal(legacyApproval({ proposedPolishReply: "" }).record.hasProposedReply, false);
+});
+
 test("correct APPROVE publishes the exact stored Polish proposal", async () => {
   const created = approval({ proposedPolishReply: "Nie zmieniaj tej propozycji." });
   const { report, calls, publishedBody } = await runCase({ record: created });
@@ -134,10 +158,36 @@ test("correct APPROVE publishes the exact stored Polish proposal", async () => {
   assert.match(publishedBody, /<!-- hrm-approval:[a-f0-9]{64} -->/);
 });
 
+test("APPROVE without a proposed reply is invalid and performs zero OpenAI or publication calls", async () => {
+  const created = approval({ proposedPolishReply: "" });
+  const { report, calls, box } = await runCase({ record: created });
+  assert.equal(created.record.hasProposedReply, false);
+  assert.equal(report.invalid, 1);
+  assert.deepEqual(
+    { resolve: calls.resolve, translate: calls.translate, marker: calls.marker, publish: calls.publish },
+    { resolve: 0, translate: 0, marker: 0, publish: 0 },
+  );
+  assert.deepEqual(box.moves, [
+    { uid: 10, folder: IMAP_FOLDERS.invalid },
+    { uid: 20, folder: IMAP_FOLDERS.invalid },
+  ]);
+});
+
 test("correct REJECT performs zero resolve, OpenAI, and publication calls", async () => {
   const { report, calls, box } = await runCase({ decision: "reject" });
   assert.equal(report.rejected, 1);
   assert.deepEqual({ resolve: calls.resolve, translate: calls.translate, publish: calls.publish }, { resolve: 0, translate: 0, publish: 0 });
+  assert.ok(box.moves.every((move) => move.folder === IMAP_FOLDERS.rejected));
+});
+
+test("REJECT without a proposed reply remains available and publishes nothing", async () => {
+  const created = approval({ proposedPolishReply: "" });
+  const { report, calls, box } = await runCase({ record: created, decision: "reject" });
+  assert.equal(report.rejected, 1);
+  assert.deepEqual(
+    { resolve: calls.resolve, translate: calls.translate, publish: calls.publish },
+    { resolve: 0, translate: 0, publish: 0 },
+  );
   assert.ok(box.moves.every((move) => move.folder === IMAP_FOLDERS.rejected));
 });
 
@@ -146,6 +196,16 @@ test("correct EDIT publishes exactly the text between deterministic markers", as
   const edited = "Pierwszy wiersz.\nDrugi wiersz pozostaje dokładnie taki.";
   const messages = [pendingMessage(created), decisionMessage(created, "edit", { edited })];
   const { publishedBody } = await runCase({ record: created, messages });
+  assert.ok(publishedBody.startsWith(edited));
+});
+
+test("EDIT with a full own reply works when the agent proposed no reply", async () => {
+  const created = approval({ proposedPolishReply: "" });
+  const edited = "To jest pełna własna odpowiedź Aleksandra.";
+  const messages = [pendingMessage(created), decisionMessage(created, "edit", { edited })];
+  const { report, calls, publishedBody } = await runCase({ record: created, messages });
+  assert.equal(report.published, 1);
+  assert.equal(calls.publish, 1);
   assert.ok(publishedBody.startsWith(edited));
 });
 

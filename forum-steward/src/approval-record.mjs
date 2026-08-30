@@ -37,12 +37,13 @@ function encodeRecord(record) {
 }
 
 function validateRecord(record) {
-  if (!record || typeof record !== "object" || Array.isArray(record) || record.v !== 1) {
+  if (!record || typeof record !== "object" || Array.isArray(record) || ![1, 2].includes(record.v)) {
     throw new Error("Invalid approval record");
   }
   const expected = [
     "approvalId", "createdAt", "expiresAt", "proposedPolishReply", "repository", "target", "v",
   ];
+  if (record.v === 2) expected.push("hasProposedReply");
   if (Object.keys(record).sort().join("|") !== expected.sort().join("|")) {
     throw new Error("Invalid approval record fields");
   }
@@ -57,12 +58,20 @@ function validateRecord(record) {
   ) {
     throw new Error("Invalid proposed Polish reply");
   }
+  const hasProposedReply = Boolean(record.proposedPolishReply.trim());
+  if (record.v === 2 && (
+    typeof record.hasProposedReply !== "boolean"
+    || record.hasProposedReply !== hasProposedReply
+  )) {
+    throw new Error("Invalid proposed reply availability");
+  }
   const createdAt = Date.parse(record.createdAt);
   const expiresAt = Date.parse(record.expiresAt);
   if (!Number.isFinite(createdAt) || !Number.isFinite(expiresAt) || expiresAt <= createdAt || expiresAt - createdAt !== APPROVAL_TTL_MS) {
     throw new Error("Invalid approval validity period");
   }
-  return record;
+  // Version 1 records remain usable; their flag is derived only from the signed reply field.
+  return record.v === 1 ? { ...record, hasProposedReply } : record;
 }
 
 export function createApprovalRecord({
@@ -78,14 +87,16 @@ export function createApprovalRecord({
   const approvalId = entropy.toString("hex");
   const createdAt = new Date(now);
   if (!Number.isFinite(createdAt.getTime())) throw new Error("Invalid approval creation time");
+  const proposedPolishReply = String(analysis?.result?.proposed_reply_pl ?? "");
   const record = validateRecord({
-    v: 1,
+    v: 2,
     approvalId,
     createdAt: createdAt.toISOString(),
     expiresAt: new Date(createdAt.getTime() + APPROVAL_TTL_MS).toISOString(),
     repository: canonicalRepository(repository),
     target: approvalTarget(entry),
-    proposedPolishReply: String(analysis?.result?.proposed_reply_pl ?? ""),
+    proposedPolishReply,
+    hasProposedReply: Boolean(proposedPolishReply.trim()),
   });
   const payload = encodeRecord(record);
   const signature = signPayload(payload, secret);
