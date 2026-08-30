@@ -1,0 +1,56 @@
+name: HRM Forum Steward
+
+on:
+  discussion:
+    types: [created]
+  discussion_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      title:
+        description: Title for a safe manual test
+        required: false
+        default: Manual HRM Forum Steward test
+        type: string
+      content:
+        description: Forum text to analyze (never published)
+        required: true
+        type: string
+      author:
+        description: Test author label
+        required: false
+        default: workflow_dispatch
+        type: string
+
+permissions:
+  contents: read
+  discussions: read
+
+concurrency:
+  group: hrm-forum-steward-${{ github.event.discussion.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    name: Analyze without publishing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out official HRM sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Analyze untrusted forum entry
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano' }}
+          OUTPUT_PATH: ${{ runner.temp }}/hrm-forum-steward-analysis.md
+        run: node forum-steward/src/index.mjs
+
+      - name: Upload analysis artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-forum-steward-analysis-${{ github.run_id }}
+          path: ${{ runner.temp }}/hrm-forum-steward-analysis.md
+          if-no-files-found: warn
+          retention-days: 7
