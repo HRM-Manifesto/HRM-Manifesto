@@ -1,7 +1,7 @@
 import { APPROVAL_RECORD_HEADER, encodeApprovalRecordHeader } from "./approval-record.mjs";
 import { escapeHtml } from "./summary.mjs";
 
-export const MAX_EMAIL_ENTRY_CHARS = 1_200;
+export const MAX_EMAIL_ENTRY_CHARS = 360;
 export const MAX_EMAIL_VISIBLE_REPLY_CHARS = 1_800;
 
 function safeUrl(value) {
@@ -100,26 +100,33 @@ export function buildAnalysisEmail({ entry, analysis, recipient, approval, actio
   const polishEntry = result.original_language === "pl" ? analysis.bodyInfo.body : result.polish_translation;
   const visibleEntry = shortText(polishEntry || result.summary_pl, MAX_EMAIL_ENTRY_CHARS);
   const visibleReply = shortText(proposedPolishReply, MAX_EMAIL_VISIBLE_REPLY_CHARS);
-  const contextNeeded = visibleEntry.truncated || analysis.bodyInfo.truncated || result.requires_aleksander_response || result.interpretation_warning;
-  const context = contextNeeded ? shortText(result.summary_pl, 420).text : "";
+  const longEntry = visibleEntry.truncated || analysis.bodyInfo.truncated;
+  const contextNeeded = longEntry || result.requires_aleksander_response || result.interpretation_warning;
+  const context = contextNeeded ? shortText(result.summary_pl, longEntry ? 260 : 420).text : "";
   const basis = basisFor(result);
   const approveLabel = visibleReply.truncated
-    ? "ZOBACZ I ZATWIERDŹ PEŁNĄ ODPOWIEDŹ"
-    : "ZATWIERDŹ I OPUBLIKUJ";
+    ? "ZOBACZ I ZATWIERDŹ ODPOWIEDŹ"
+    : (gatewayMode ? "ZATWIERDŹ I OPUBLIKUJ" : "ZATWIERDŹ E-MAILEM");
   const canApproveFromEmail = hasProposedReply && (!visibleReply.truncated || gatewayMode);
+  const editActionLabel = gatewayMode
+    ? (hasProposedReply ? "POPRAW" : "NAPISZ ODPOWIEDŹ")
+    : (hasProposedReply ? "POPRAW E-MAILEM" : "NAPISZ ODPOWIEDŹ E-MAILEM");
+  const rejectActionLabel = gatewayMode ? "NIE ODPOWIADAJ" : "NIE ODPOWIADAJ E-MAILEM";
 
   const actionText = hasProposedReply
     ? [
       canApproveFromEmail ? textAction(approveLabel, actionLinks.approve) : "Pełna odpowiedź wymaga bezpiecznego ekranu zatwierdzenia.",
-      textAction("POPRAW", actionLinks.edit),
-      textAction("NIE ODPOWIADAJ", actionLinks.reject),
+      textAction(editActionLabel, actionLinks.edit),
+      textAction(rejectActionLabel, actionLinks.reject),
     ].filter(Boolean).join("\n\n")
     : [
       "Agent nie proponuje gotowej odpowiedzi.",
-      textAction("NAPISZ ODPOWIEDŹ", actionLinks.edit),
-      textAction("NIE ODPOWIADAJ", actionLinks.reject),
+      textAction(editActionLabel, actionLinks.edit),
+      textAction(rejectActionLabel, actionLinks.reject),
     ].join("\n\n");
-  const originalLabel = result.original_language === "pl" ? "Otwórz wpis na GitHubie" : "Otwórz oryginał na GitHubie";
+  const originalLabel = longEntry
+    ? "Otwórz pełny wpis"
+    : (result.original_language === "pl" ? "Otwórz wpis na GitHubie" : "Otwórz oryginał na GitHubie");
   const originalLinkText = discussionUrl ? `${originalLabel}: ${discussionUrl}` : "";
 
   const text = `HRM
@@ -128,9 +135,9 @@ ${hasProposedReply ? "Odpowiedź do zatwierdzenia" : "Potrzebna Twoja decyzja"}
 
 ${authorAndCategory}
 
-NAPISAŁ:
-${visibleEntry.text || "(pusty wpis)"}${visibleEntry.truncated ? "\n\nPełny wpis jest dostępny na GitHubie." : ""}
-${context ? `\nKONTEKST:\n${context}\n` : ""}
+${longEntry ? `STRESZCZENIE:\n${context}\n\nFRAGMENT WPISU:` : "NAPISAŁ:"}
+${visibleEntry.text || "(pusty wpis)"}${longEntry ? "\n\nPełny wpis jest dostępny na GitHubie." : ""}
+${!longEntry && context ? `\nKONTEKST:\n${context}\n` : ""}
 ${hasProposedReply ? `PROPONOWANA ODPOWIEDŹ:\n${visibleReply.text}${visibleReply.truncated ? "\n\nPełna odpowiedź jest dostępna na bezpiecznym ekranie zatwierdzenia." : ""}\n` : ""}
 ${basis ? `${basis}\n` : ""}
 ${actionText}
@@ -138,9 +145,17 @@ ${actionText}
 ${originalLinkText}
 `;
 
-  const contextHtml = context
+  const contextHtml = context && !longEntry
     ? `<h2 style="margin:24px 0 8px;font-size:18px;line-height:1.3">KONTEKST</h2><p style="margin:0;overflow-wrap:anywhere">${escapeHtml(context)}</p>`
     : "";
+  const entryHtml = longEntry
+    ? `<h2 style="margin:0 0 8px;font-size:18px;line-height:1.3">STRESZCZENIE</h2>
+<p style="margin:0;overflow-wrap:anywhere">${escapeHtml(context)}</p>
+<h2 style="margin:20px 0 8px;font-size:18px;line-height:1.3">FRAGMENT WPISU</h2>
+<div style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(visibleEntry.text || "(pusty wpis)")}</div>
+<p style="margin:8px 0 0;color:#40564c">Pokazano skrócony fragment. Pełny wpis jest dostępny pod linkiem poniżej.</p>`
+    : `<h2 style="margin:0 0 8px;font-size:18px;line-height:1.3">NAPISAŁ</h2>
+<div style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(visibleEntry.text || "(pusty wpis)")}</div>`;
   const basisHtml = basis ? `<p style="margin:20px 0 0;color:#40564c">${escapeHtml(basis)}</p>` : "";
   const proposalHtml = hasProposedReply
     ? `<h2 style="margin:24px 0 8px;font-size:18px;line-height:1.3">PROPONOWANA ODPOWIEDŹ</h2>
@@ -148,8 +163,7 @@ ${originalLinkText}
 ${visibleReply.truncated ? "<p style=\"margin:10px 0 0\"><strong>Pełna odpowiedź jest dostępna na bezpiecznym ekranie zatwierdzenia.</strong></p>" : ""}`
     : `<p style="margin:24px 0 0;padding:16px;border-left:4px solid #8a5a00;background:#fff7df"><strong>Agent nie proponuje gotowej odpowiedzi.</strong></p>`;
   const approveHtml = canApproveFromEmail ? buttonHtml(actionLinks.approve, approveLabel, "#185b43") : "";
-  const editLabel = hasProposedReply ? "POPRAW" : "NAPISZ ODPOWIEDŹ";
-  const actionsHtml = `${approveHtml}${buttonHtml(actionLinks.edit, editLabel, "#315a78")}${buttonHtml(actionLinks.reject, "NIE ODPOWIADAJ", "#742c35")}`;
+  const actionsHtml = `${approveHtml}${buttonHtml(actionLinks.edit, editActionLabel, "#315a78")}${buttonHtml(actionLinks.reject, rejectActionLabel, "#742c35")}`;
   const originalHtml = discussionUrl
     ? `<p style="margin:22px 0 0"><a href="${escapeHtml(discussionUrl)}" style="display:block;min-height:44px;line-height:44px;color:#164b3a;font-weight:700;text-align:center">${escapeHtml(originalLabel.toUpperCase())}</a></p>`
     : "";
@@ -160,9 +174,7 @@ ${visibleReply.truncated ? "<p style=\"margin:10px 0 0\"><strong>Pełna odpowied
 <p style="margin:0 0 14px;font-size:20px;font-weight:700;letter-spacing:.08em">HRM</p>
 <h1 style="margin:0 0 8px;font-size:22px;line-height:1.25">${hasProposedReply ? "Odpowiedź do zatwierdzenia" : "Potrzebna Twoja decyzja"}</h1>
 <p style="margin:0 0 24px;color:#40564c;overflow-wrap:anywhere">${escapeHtml(authorAndCategory)}</p>
-<h2 style="margin:0 0 8px;font-size:18px;line-height:1.3">NAPISAŁ</h2>
-<div style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(visibleEntry.text || "(pusty wpis)")}</div>
-${visibleEntry.truncated ? "<p><strong>Pokazano skrócony fragment. Pełny wpis jest dostępny na GitHubie.</strong></p>" : ""}
+${entryHtml}
 ${contextHtml}${proposalHtml}${basisHtml}
 <section aria-label="Decyzja" style="margin-top:24px">${actionsHtml}</section>
 ${originalHtml}

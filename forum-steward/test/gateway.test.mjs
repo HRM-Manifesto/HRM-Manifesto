@@ -69,16 +69,20 @@ async function confirmation(handle, actionUrl) {
   const page = await handle(new Request(actionUrl));
   const html = await page.text();
   const csrf = html.match(/name="csrf" value="([^"]+)"/)?.[1];
-  const cookie = page.headers.get("set-cookie")?.split(";", 1)[0];
+  const setCookies = typeof page.headers.getSetCookie === "function"
+    ? page.headers.getSetCookie()
+    : [page.headers.get("set-cookie")];
+  const cookie = setCookies.filter(Boolean).map((value) => value.split(";", 1)[0]).join("; ");
   assert.ok(csrf);
   assert.ok(cookie);
   return { csrf, cookie, html };
 }
 
 async function decide(handle, actionUrl, { csrf, cookie, reply } = {}) {
+  const action = new URL(actionUrl).pathname.split("/")[2];
   const body = new URLSearchParams({ csrf });
   if (reply !== undefined) body.set("reply", reply);
-  return handle(new Request(actionUrl, {
+  return handle(new Request(`${baseUrl}/decision/${action}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -127,6 +131,18 @@ test("approve requires a POST and the capability token is single-use", async () 
   assert.equal(calls.execute, 1);
   const replay = await decide(handle, registered.payload.links.approve, form);
   assert.equal(replay.status, 409);
+  assert.equal(calls.execute, 1);
+});
+
+test("concurrent double POST has exactly one winner", async () => {
+  const { handle, calls, created } = setup();
+  const registered = await register(handle, created);
+  const form = await confirmation(handle, registered.payload.links.approve);
+  const [first, second] = await Promise.all([
+    decide(handle, registered.payload.links.approve, form),
+    decide(handle, registered.payload.links.approve, form),
+  ]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 409]);
   assert.equal(calls.execute, 1);
 });
 
@@ -184,6 +200,9 @@ test("approval page displays the complete long proposal before POST", async () =
   const registered = await register(handle, created);
   const form = await confirmation(handle, registered.payload.links.approve);
   assert.match(form.html, /KONIEC PEŁNEJ ODPOWIEDZI/);
+  const token = new URL(registered.payload.links.approve).pathname.split("/").at(-1);
+  assert.doesNotMatch(form.html, new RegExp(token));
+  assert.doesNotMatch(form.html, /Approval ID|node ID|SHA|workflow/i);
 });
 
 test("quiet mailbox full scenario leaves exactly one human email", async () => {

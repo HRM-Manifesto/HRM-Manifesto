@@ -151,9 +151,9 @@ test("long comment and long reply are bounded for mobile review", () => {
   const longReply = reviewEmailFixtures()[5];
   assert.ok(longComment.message.text.length < longComment.analysis.result.polish_translation.length);
   assert.match(longComment.message.html, /Pokazano skrócony fragment/);
-  assert.match(longReply.message.html, /ZOBACZ I ZATWIERDŹ PEŁNĄ ODPOWIEDŹ/);
+  assert.match(longReply.message.html, /ZOBACZ I ZATWIERDŹ ODPOWIEDŹ/);
   assert.ok(longComment.message.html.length < longComment.analysis.result.polish_translation.length + 8_000);
-  assert.equal(MAX_EMAIL_ENTRY_CHARS, 1_200);
+  assert.equal(MAX_EMAIL_ENTRY_CHARS, 360);
   assert.equal(MAX_EMAIL_VISIBLE_REPLY_CHARS, 1_800);
 });
 

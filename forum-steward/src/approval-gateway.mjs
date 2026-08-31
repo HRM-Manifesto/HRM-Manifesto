@@ -79,12 +79,13 @@ function verifyCsrf({ supplied, cookie, token, action, secret, now }) {
   return secureEqual(parts[2], expected);
 }
 
-function cookieValue(request) {
-  const match = String(request.headers.get("cookie") ?? "").match(/(?:^|;\s*)hrm_csrf=([^;]+)/);
+function cookieValue(request, name) {
+  const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = String(request.headers.get("cookie") ?? "").match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
   return match?.[1] ?? "";
 }
 
-function actionPage({ action, token, record, csrf }) {
+function actionPage({ action, record, csrf }) {
   const proposed = record.proposedPolishReply;
   let title;
   let detail;
@@ -112,7 +113,7 @@ function actionPage({ action, token, record, csrf }) {
     color = "#742c35";
   }
   return page(title, `${detail}
-<form method="post" action="/a/${action}/${token}" style="margin-top:18px">
+<form method="post" action="/decision/${action}" style="margin-top:18px">
 <input type="hidden" name="csrf" value="${escapeHtml(csrf)}">
 ${button(label, color)}
 </form>
@@ -188,9 +189,10 @@ export class MemoryGatewayStore {
   }
 
   async claim(hash, now) {
-    const state = await this.peek(hash, now);
-    if (state.kind !== "active") return state;
     const item = this.byTokenHash.get(hash);
+    if (!item) return { kind: "missing" };
+    if (Date.parse(item.record.expiresAt) < now.getTime()) return { kind: "expired" };
+    if (item.status !== "active") return { kind: "used", status: item.status, result: item.result };
     item.status = "processing";
     this.mutationCount += 1;
     return { kind: "claimed", record: item.record };
@@ -267,16 +269,20 @@ export function createApprovalGateway({
       }
     }
 
-    const match = url.pathname.match(/^\/a\/(approve|edit|reject)\/([A-Za-z0-9_-]{43})$/);
-    if (!match) return new Response(page("Nie znaleziono", "<h1 style=\"font-size:22px\">Nie znaleziono</h1>"), { status: 404, headers: securityHeaders() });
-    const [, action, token] = match;
-    const hash = tokenHash(token);
-    const purpose = `${request.headers.get("purpose") ?? ""} ${request.headers.get("sec-purpose") ?? ""}`.toLowerCase();
-    if ((request.method === "GET" || request.method === "HEAD") && purpose.includes("prefetch")) {
-      return new Response(null, { status: 204, headers: securityHeaders() });
-    }
+    const pageMatch = url.pathname.match(/^\/a\/(approve|edit|reject)\/([A-Za-z0-9_-]{43})$/);
+    const decisionMatch = url.pathname.match(/^\/decision\/(approve|edit|reject)$/);
+    if (!pageMatch && !decisionMatch) return new Response(page("Nie znaleziono", "<h1 style=\"font-size:22px\">Nie znaleziono</h1>"), { status: 404, headers: securityHeaders() });
 
-    if (request.method === "GET" || request.method === "HEAD") {
+    if (pageMatch) {
+      const [, action, token] = pageMatch;
+      const hash = tokenHash(token);
+      const purpose = `${request.headers.get("purpose") ?? ""} ${request.headers.get("sec-purpose") ?? ""}`.toLowerCase();
+      if ((request.method === "GET" || request.method === "HEAD") && purpose.includes("prefetch")) {
+        return new Response(null, { status: 204, headers: securityHeaders() });
+      }
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response(null, { status: 405, headers: { ...securityHeaders(), Allow: "GET, HEAD" } });
+      }
       const state = await store.peek(hash, now);
       if (state.kind !== "active") {
         const body = request.method === "HEAD" ? null : statusPage(state.kind);
@@ -286,13 +292,19 @@ export function createApprovalGateway({
         return new Response(request.method === "HEAD" ? null : statusPage("invalid"), { status: 409, headers: securityHeaders() });
       }
       const csrf = csrfValue({ token, action, secret: csrfSecret, now, randomBytesImpl });
-      const headers = securityHeaders();
-      headers["Set-Cookie"] = `hrm_csrf=${csrf}; Path=/; Max-Age=900; Secure; HttpOnly; SameSite=Strict`;
-      return new Response(request.method === "HEAD" ? null : actionPage({ action, token, record: state.record, csrf }), { status: 200, headers });
+      if (request.method === "HEAD") return new Response(null, { status: 200, headers: securityHeaders() });
+      const headers = new Headers(securityHeaders());
+      headers.append("Set-Cookie", `hrm_cap=${token}; Path=/decision/; Max-Age=900; Secure; HttpOnly; SameSite=Strict`);
+      headers.append("Set-Cookie", `hrm_csrf=${csrf}; Path=/decision/; Max-Age=900; Secure; HttpOnly; SameSite=Strict`);
+      return new Response(actionPage({ action, record: state.record, csrf }), { status: 200, headers });
     }
 
-    if (request.method !== "POST") return new Response(null, { status: 405, headers: { ...securityHeaders(), Allow: "GET, HEAD, POST" } });
+    const action = decisionMatch[1];
+    if (request.method !== "POST") return new Response(null, { status: 405, headers: { ...securityHeaders(), Allow: "POST" } });
     if (request.headers.get("origin") !== baseUrl.origin) return new Response(statusPage("invalid"), { status: 403, headers: securityHeaders() });
+    const token = cookieValue(request, "hrm_cap");
+    if (!TOKEN_PATTERN.test(token)) return new Response(statusPage("invalid"), { status: 403, headers: securityHeaders() });
+    const hash = tokenHash(token);
 
     let form;
     try {
@@ -305,7 +317,7 @@ export function createApprovalGateway({
     }
     if (!verifyCsrf({
       supplied: form.get("csrf"),
-      cookie: cookieValue(request),
+      cookie: cookieValue(request, "hrm_csrf"),
       token,
       action,
       secret: csrfSecret,

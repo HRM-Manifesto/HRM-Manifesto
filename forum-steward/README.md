@@ -44,7 +44,7 @@ Bezpieczny wariant to:
 
 ## Approval Gateway — przygotowany, niewdrożony
 
-Kod audytowalnej maszyny stanów znajduje się w `src/approval-gateway.mjs`, a kontrakt trwałej bazy i schemat w `approval-gateway/`.
+Referencyjna maszyna stanów znajduje się w `src/approval-gateway.mjs`. Kompletny wariant produkcyjny PHP, trwały adapter PDO, schemat bazy, testy oraz instrukcja wdrożenia znajdują się w `approval-gateway/`.
 
 - losowy token ma 256 bitów entropii, nie jest Approval ID i w bazie występuje tylko jako SHA-256;
 - token wygasa razem z podpisanym rekordem, domyślnie po 14 dniach;
@@ -55,7 +55,7 @@ Kod audytowalnej maszyny stanów znajduje się w `src/approval-gateway.mjs`, a k
 - `EDIT` przekazuje dokładny polski tekst Aleksandra; model może go jedynie wiernie przetłumaczyć;
 - `REJECT` nie wywołuje OpenAI ani GitHuba.
 
-`MemoryGatewayStore` jest wyłącznie implementacją testową. Produkcja musi używać transakcyjnego adaptera bazy zgodnego z `approval-gateway/schema.sql`. Gateway nie może być uruchomiony publicznie z magazynem w pamięci.
+`MemoryGatewayStore` jest wyłącznie implementacją testową. Produkcyjny entrypoint PHP zawsze używa transakcyjnego `PdoGatewayStore` zgodnego z `approval-gateway/schema.sql`.
 
 ### Hosting Loopia
 
@@ -65,12 +65,9 @@ Publiczne `hrm.se` odpowiada obecnie z infrastruktury Loopia. Oficjalna dokument
 - [Node.js wymaga VPS](https://support.loopia.se/wiki/fungerar-node-js-pa-loopia/)
 - [MySQL/MariaDB](https://support.loopia.se/wiki/mysql-administration/)
 
-Repozytorium nie pozwala ustalić pakietu konta, aktywnego PHP ani dostępności bazy. Dlatego gateway nie zakłada runtime i nie jest wdrażany. Przed wdrożeniem należy wybrać jedno z dwóch rozwiązań po osobnym audycie:
+Wybrany wariant to **PHP 8.x + MariaDB/MySQL na zwykłym hostingu UNIX Loopia**. Node.js wymagałby VPS i dodatkowej administracji, której ten mały gateway nie potrzebuje. Repozytorium nie potwierdza jednak pakietu konkretnego konta, dlatego przed wdrożeniem Aleksander musi sprawdzić w panelu dostępność PHP 8.2+, bazy i HTTPS. Dokładny układ plików, lista rozszerzeń, baza, GitHub App oraz ręczne kroki są opisane w `approval-gateway/README.md`.
 
-1. mały port PHP + MariaDB na hostingu UNIX, jeśli panel potwierdzi te funkcje;
-2. obecna implementacja Node na osobnym Loopia VPS z transakcyjną bazą.
-
-W obu przypadkach gateway powinien działać na osobnej domenie HTTPS, np. `approve.hrm.se`, bez zmian publicznej zawartości `www.hrm.se`.
+Gateway ma działać wyłącznie na osobnej domenie `https://approve.hrm.se/`, bez zmian publicznej zawartości `www.hrm.se`.
 
 ## Quiet mailbox
 
@@ -129,7 +126,7 @@ Gateway poza GitHub Actions będzie potrzebował własnych, niecommitowanych war
 - tego samego `HRM_GATEWAY_SHARED_SECRET` do uwierzytelnienia rejestracji;
 - niezależnego `HRM_GATEWAY_CSRF_SECRET`;
 - poświadczeń transakcyjnej bazy danych;
-- repozytoryjnego GitHub App lub wąsko ograniczonego tokenu z prawem zapisu tylko do Discussions;
+- GitHub App zainstalowanej wyłącznie w tym repozytorium, z `Discussions: read and write` oraz automatycznym `Metadata: read-only`;
 - `OPENAI_API_KEY` i modelu wyłącznie do wiernego tłumaczenia zatwierdzonego tekstu.
 
 Nie ustawiaj URL ani sekretu gateway, dopóki backend, baza, TLS, kopie zapasowe, limity ruchu i logowanie bez danych wrażliwych nie przejdą osobnego audytu stagingowego.
@@ -167,7 +164,7 @@ Nie dodano `contents: write`, `issues: write`, `pull-requests: write` ani `actio
 - Dla innego języka jest najwyżej jedno wywołanie tłumaczące, które nie może zmienić sensu.
 - Nie ma funkcji usuwania wpisów, blokowania użytkowników, zamykania dyskusji ani edycji HRM 1.0.
 
-Limity pozostają: wpis 8 000 znaków, źródła 12 000 znaków i 6 fragmentów, zatwierdzona odpowiedź 8 000 znaków, wiadomość IMAP 256 000 bajtów. E-mail pokazuje najwyżej 1 200 znaków wpisu i 1 800 znaków propozycji.
+Limity pozostają: wpis 8 000 znaków, źródła 12 000 znaków i 6 fragmentów, zatwierdzona odpowiedź 8 000 znaków, wiadomość IMAP 256 000 bajtów. E-mail pokazuje najwyżej 360 znaków wpisu i 1 800 znaków propozycji.
 
 ## Wyłączenie
 
@@ -186,4 +183,10 @@ cd forum-steward
 npm ci
 npm test
 npm audit --omit=dev
+```
+
+Gateway PHP wymaga dodatkowo PHP 8.2+ z `curl`, `mbstring`, `openssl`, `PDO` i `pdo_mysql`:
+
+```bash
+php approval-gateway/php/test/run.php
 ```
