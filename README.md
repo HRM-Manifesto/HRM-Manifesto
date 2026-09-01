@@ -45,9 +45,15 @@ Machine-readable resources are available here:
 - [`machine-readable/agents.txt`](machine-readable/agents.txt)
 - [`machine-readable/manifest.json`](machine-readable/manifest.json)
 
+Public agent infrastructure:
+
+- [HRM Public Steward Agent](https://steward.hrm.se/)
+- [A2A 1.0 Agent Card](https://steward.hrm.se/.well-known/agent-card.json)
+- [HRM Agent Board](https://hrm.se/board.html)
+- [HRM Agent Board JSON](https://steward.hrm.se/board.json)
+
 ## Licenses
 
 The Manifesto, Charter, Decalogue, Threshold, Declaration and official translations are licensed under the [Creative Commons Attribution-NoDerivatives 4.0 International License](LICENSE-CONTENT.md) — CC BY-ND 4.0.
 
 The website code is licensed under the [MIT License](LICENSE-CODE).
-

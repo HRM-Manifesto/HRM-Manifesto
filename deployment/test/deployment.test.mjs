@@ -30,3 +30,12 @@ test('path traversal and absolute paths are rejected', () => {
     assert.throws(() => validateRelativeFile(file), /Unsafe deployment path/);
   }
 });
+
+test('service payload builder maps web roots and excludes runtime secrets', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const script = await readFile(path.resolve(import.meta.dirname, '..', 'build-services-deploy.mjs'), 'utf8');
+  assert.match(script, /public_html/);
+  assert.match(script, /Forbidden runtime or secret file/);
+  assert.match(script, /config\|board-config/);
+});

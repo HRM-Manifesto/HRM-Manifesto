@@ -2,6 +2,9 @@
 agents.html
 agents.md
 agents.txt
+board.html
+css/board.css
+js/board.js
 llms.txt
 manifest.json
 sitemap.xml

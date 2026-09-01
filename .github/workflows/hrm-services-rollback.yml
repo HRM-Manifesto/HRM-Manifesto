@@ -1,0 +1,63 @@
+name: HRM Steward and Board Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_run_id:
+        description: Run ID of HRM Steward and Board Deploy to restore
+        required: true
+        type: string
+      confirmation:
+        description: Type ROLLBACK HRM SERVICES exactly
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: hrm-services-production
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: inputs.confirmation == 'ROLLBACK HRM SERVICES'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: hrm-production
+    steps:
+      - name: Download selected code rollback artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hrm-services-backup-${{ inputs.deploy_run_id }}
+          path: backup
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.deploy_run_id }}
+      - name: Restore exact previous code without touching runtime configuration or data
+        env:
+          STEWARD_FTPS_USERNAME: ${{ secrets.STEWARD_FTPS_USERNAME }}
+          STEWARD_FTPS_PASSWORD: ${{ secrets.STEWARD_FTPS_PASSWORD }}
+          GATEWAY_FTPS_USERNAME: ${{ secrets.GATEWAY_FTPS_USERNAME }}
+          GATEWAY_FTPS_PASSWORD: ${{ secrets.GATEWAY_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          restore_component() {
+            component="$1" user="$2" password="$3"
+            test -s "backup/$component/paths.txt"
+            while IFS= read -r file; do
+              case "$file" in ''|/*|*'..'*|*'\'*) exit 1;; esac
+              if grep -Fxq "$file" "backup/$component/missing.txt"; then
+                curl --fail --silent --show-error --ftp-ssl-reqd --user "$user:$password" --quote "DELE /$file" ftp://ftpcluster.loopia.se/ || true
+              else
+                curl --fail --silent --show-error --ftp-ssl-reqd --ftp-create-dirs --user "$user:$password" --upload-file "backup/$component/files/$file" "ftp://ftpcluster.loopia.se/$file"
+              fi
+            done < "backup/$component/paths.txt"
+          }
+          restore_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
+          restore_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
+      - name: Verify public HTTPS after rollback
+        run: |
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://steward.hrm.se/health > /dev/null
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://approve.hrm.se/ > /dev/null || test "$?" = 22

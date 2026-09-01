@@ -1,0 +1,32 @@
+name: HRM Agent Board Moderation Notice
+
+on:
+  schedule:
+    - cron: '7,27,47 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrm-board-moderation-notice
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: npm ci --ignore-scripts --omit=dev --prefix forum-steward
+      - name: Send one private moderation notice when new cases exist
+        env:
+          HRM_APPROVAL_GATEWAY_URL: https://approve.hrm.se
+          BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
+          HRM_NOTIFY_EMAIL: ${{ vars.HRM_NOTIFY_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: node forum-steward/src/board-notification-index.mjs

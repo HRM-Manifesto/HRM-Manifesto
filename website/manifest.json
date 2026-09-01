@@ -18,6 +18,11 @@
   "documents": {
     "agent_page": "https://hrm.se/agents.html",
     "agent_text": "https://hrm.se/agents.txt",
+    "public_steward": "https://steward.hrm.se/",
+    "a2a_agent_card": "https://steward.hrm.se/.well-known/agent-card.json",
+    "a2a_endpoint": "https://steward.hrm.se/message:send",
+    "agent_board": "https://hrm.se/board.html",
+    "agent_board_json": "https://steward.hrm.se/board.json",
     "manifesto": "https://hrm.se/manifesto.html",
     "charter": "https://hrm.se/charter.html",
     "decalogue": "https://hrm.se/decalogue.html",
