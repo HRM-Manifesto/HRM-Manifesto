@@ -35,6 +35,14 @@ test('public PHP surfaces have request, size, version, media and moderation gate
   assert.match(gateway, /CURLOPT_SSL_VERIFYPEER => true/);
 });
 
+test('Board Gateway uses its dedicated database configuration', async () => {
+  const entrypoint = await read('forum-steward/approval-gateway/php/public/index.php');
+  assert.match(entrypoint, /PdoBoardCaseStore::connect\(\(array\) \(\$boardConfig\['database'\]/);
+  assert.doesNotMatch(entrypoint, /PdoBoardCaseStore::connect\(\(array\) \(\$config\['database'\]/);
+  const example = await read('forum-steward/approval-gateway/php/board-config.example.php');
+  assert.match(example, /'database'\s*=>/);
+});
+
 test('no committed runtime secret configuration is present', async () => {
   const ignore = await read('.gitignore');
   assert.match(ignore, /agent-steward\/php\/resources\/sources\.php/);
