@@ -21,7 +21,7 @@ jobs:
       - run: npm ci --ignore-scripts --omit=dev --prefix forum-steward
       - name: Send one private moderation notice when new cases exist
         env:
-          HRM_APPROVAL_GATEWAY_URL: https://approve.hrm.se
+          HRM_APPROVAL_GATEWAY_URL: https://approve.hrm.se/bootstrap.php
           BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
           HRM_NOTIFY_EMAIL: ${{ vars.HRM_NOTIFY_EMAIL }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}

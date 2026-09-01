@@ -47,10 +47,13 @@ test('Board Gateway uses its dedicated database configuration', async () => {
 test('Gateway bootstrap bypasses stale Loopia PHP opcode cache', async () => {
   const htaccess = await read('forum-steward/approval-gateway/php/public/.htaccess');
   const bootstrap = await read('forum-steward/approval-gateway/php/public/bootstrap.php');
+  const notificationWorkflow = await read('.github/workflows/hrm-board-moderation-notify.yml');
   assert.match(htaccess, /DirectoryIndex bootstrap\.php/);
   assert.match(htaccess, /RewriteRule \^ bootstrap\.php/);
+  assert.match(bootstrap, /\$_SERVER\['REQUEST_URI'\]/);
   assert.match(bootstrap, /opcache_invalidate\(\$entrypoint, true\)/);
   assert.match(bootstrap, /require \$entrypoint/);
+  assert.match(notificationWorkflow, /HRM_APPROVAL_GATEWAY_URL: https:\/\/approve\.hrm\.se\/bootstrap\.php/);
 });
 
 test('no committed runtime secret configuration is present', async () => {
