@@ -1,0 +1,9 @@
+<?php
+return [
+    'steward_origin' => 'https://steward.hrm.se',
+    'gateway_shared_secret' => 'same-dedicated-secret-as-the-public-steward',
+    'moderation_callback_secret' => 'same-dedicated-callback-secret-as-the-public-steward',
+    'notification_api_secret' => 'dedicated-secret-used-only-by-the-GitHub-notification-workflow',
+    'notification_encryption_secret' => 'dedicated-secret-used-to-encrypt-one-time-links-at-rest',
+    'csrf_secret' => 'dedicated-random-secret-at-least-32-bytes',
+];

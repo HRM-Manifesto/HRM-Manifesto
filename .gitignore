@@ -2,3 +2,7 @@ forum-steward/approval-gateway/php/config.php
 forum-steward/approval-gateway/php/private/
 /_preview_v22_gateway/
 /deployment/dist/
+/deployment/services-dist/
+/agent-steward/php/resources/sources.php
+/agent-steward/test/.venv/
+/forum-steward/approval-gateway/php/board-config.php

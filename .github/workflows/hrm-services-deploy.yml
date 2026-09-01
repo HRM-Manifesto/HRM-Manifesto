@@ -1,0 +1,190 @@
+name: HRM Steward and Board Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY HRM SERVICES exactly
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrm-services-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test Steward, Board, A2A and protected HRM
+    if: inputs.confirmation == 'DEPLOY HRM SERVICES'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out reviewed code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install locked Forum Steward dependencies
+        run: npm ci --ignore-scripts --prefix forum-steward
+      - name: Run existing Forum Steward tests
+        run: npm test --prefix forum-steward
+      - name: Build official HRM source index
+        run: node agent-steward/build-sources.mjs
+      - name: Run Node safety and deployment tests
+        run: node --test agent-steward/test/static.test.mjs deployment/test/deployment.test.mjs
+      - name: Install PHP test runtime
+        run: sudo apt-get update && sudo apt-get install -y php-cli php-mbstring
+      - name: Lint all PHP
+        shell: bash
+        run: find agent-steward/php forum-steward/approval-gateway/php -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Run Steward and Board Gateway PHP tests
+        run: |
+          php agent-steward/php/test/run.php
+          php forum-steward/approval-gateway/php/test/run.php
+          php forum-steward/approval-gateway/php/test/board-run.php
+      - name: Validate Agent Card with official A2A SDK
+        run: |
+          python -m pip install --disable-pip-version-check --no-input \
+            'a2a-sdk @ git+https://github.com/a2aproject/a2a-python.git@4e71245bf2bf4b31f6429f12d97991f1f3d4b3f4'
+          python agent-steward/test/validate_sdk.py
+      - name: Verify protected historical checksums
+        run: sha256sum --check integrity/SHA256SUMS.txt
+      - name: Build reviewed service payload
+        run: node deployment/build-services-deploy.mjs
+      - name: Upload tested service payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-services-tested-${{ github.run_id }}
+          path: deployment/services-dist/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy:
+    name: Backup and deploy Steward and Gateway over verified FTPS
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: hrm-production
+    steps:
+      - name: Download tested payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hrm-services-tested-${{ github.run_id }}
+          path: payload
+      - name: Require deployment and runtime secrets
+        env:
+          STEWARD_FTPS_USERNAME: ${{ secrets.STEWARD_FTPS_USERNAME }}
+          STEWARD_FTPS_PASSWORD: ${{ secrets.STEWARD_FTPS_PASSWORD }}
+          GATEWAY_FTPS_USERNAME: ${{ secrets.GATEWAY_FTPS_USERNAME }}
+          GATEWAY_FTPS_PASSWORD: ${{ secrets.GATEWAY_FTPS_PASSWORD }}
+          STEWARD_DB_HOST: ${{ secrets.STEWARD_DB_HOST }}
+          STEWARD_DB_NAME: ${{ secrets.STEWARD_DB_NAME }}
+          STEWARD_DB_USER: ${{ secrets.STEWARD_DB_USER }}
+          STEWARD_DB_PASSWORD: ${{ secrets.STEWARD_DB_PASSWORD }}
+          BOARD_GATEWAY_SHARED_SECRET: ${{ secrets.BOARD_GATEWAY_SHARED_SECRET }}
+          BOARD_MODERATION_CALLBACK_SECRET: ${{ secrets.BOARD_MODERATION_CALLBACK_SECRET }}
+          STEWARD_RATE_LIMIT_SECRET: ${{ secrets.STEWARD_RATE_LIMIT_SECRET }}
+          BOARD_GATEWAY_CSRF_SECRET: ${{ secrets.BOARD_GATEWAY_CSRF_SECRET }}
+          BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
+          BOARD_NOTIFICATION_ENCRYPTION_SECRET: ${{ secrets.BOARD_NOTIFICATION_ENCRYPTION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in STEWARD_FTPS_USERNAME STEWARD_FTPS_PASSWORD GATEWAY_FTPS_USERNAME GATEWAY_FTPS_PASSWORD STEWARD_DB_HOST STEWARD_DB_NAME STEWARD_DB_USER STEWARD_DB_PASSWORD BOARD_GATEWAY_SHARED_SECRET BOARD_MODERATION_CALLBACK_SECRET STEWARD_RATE_LIMIT_SECRET BOARD_GATEWAY_CSRF_SECRET BOARD_NOTIFICATION_API_SECRET BOARD_NOTIFICATION_ENCRYPTION_SECRET; do
+            test -n "${!name}"
+          done
+      - name: Back up exact code targets without reading runtime secrets
+        env:
+          STEWARD_FTPS_USERNAME: ${{ secrets.STEWARD_FTPS_USERNAME }}
+          STEWARD_FTPS_PASSWORD: ${{ secrets.STEWARD_FTPS_PASSWORD }}
+          GATEWAY_FTPS_USERNAME: ${{ secrets.GATEWAY_FTPS_USERNAME }}
+          GATEWAY_FTPS_PASSWORD: ${{ secrets.GATEWAY_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup_component() {
+            component="$1" user="$2" password="$3"
+            mkdir -p "backup/$component/files"
+            : > "backup/$component/missing.txt"
+            find "payload/$component" -type f -printf '%P\n' | LC_ALL=C sort > "backup/$component/paths.txt"
+            while IFS= read -r file; do
+              mkdir -p "backup/$component/files/$(dirname "$file")"
+              set +e
+              curl --fail --silent --show-error --ftp-ssl-reqd --user "$user:$password" "ftp://ftpcluster.loopia.se/$file" --output "backup/$component/files/$file"
+              result=$?
+              set -e
+              if [ "$result" -eq 9 ] || [ "$result" -eq 78 ]; then rm -f "backup/$component/files/$file"; printf '%s\n' "$file" >> "backup/$component/missing.txt"; elif [ "$result" -ne 0 ]; then exit "$result"; fi
+            done < "backup/$component/paths.txt"
+          }
+          backup_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
+          backup_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
+      - name: Save code rollback artifact before deployment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-services-backup-${{ github.run_id }}
+          path: backup/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+      - name: Create first-run configuration locally without logging values
+        env:
+          STEWARD_DB_HOST: ${{ secrets.STEWARD_DB_HOST }}
+          STEWARD_DB_NAME: ${{ secrets.STEWARD_DB_NAME }}
+          STEWARD_DB_USER: ${{ secrets.STEWARD_DB_USER }}
+          STEWARD_DB_PASSWORD: ${{ secrets.STEWARD_DB_PASSWORD }}
+          BOARD_GATEWAY_SHARED_SECRET: ${{ secrets.BOARD_GATEWAY_SHARED_SECRET }}
+          BOARD_MODERATION_CALLBACK_SECRET: ${{ secrets.BOARD_MODERATION_CALLBACK_SECRET }}
+          STEWARD_RATE_LIMIT_SECRET: ${{ secrets.STEWARD_RATE_LIMIT_SECRET }}
+          BOARD_GATEWAY_CSRF_SECRET: ${{ secrets.BOARD_GATEWAY_CSRF_SECRET }}
+          BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
+          BOARD_NOTIFICATION_ENCRYPTION_SECRET: ${{ secrets.BOARD_NOTIFICATION_ENCRYPTION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, pathlib
+          def php(value): return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
+          steward = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'approval_gateway_origin' => 'https://approve.hrm.se',\n  'approval_gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'rate_limit_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','STEWARD_RATE_LIMIT_SECRET'])
+          gateway = "<?php\nreturn [\n  'steward_origin' => 'https://steward.hrm.se',\n  'gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'notification_api_secret' => %s,\n  'notification_encryption_secret' => %s,\n  'csrf_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','BOARD_NOTIFICATION_API_SECRET','BOARD_NOTIFICATION_ENCRYPTION_SECRET','BOARD_GATEWAY_CSRF_SECRET'])
+          pathlib.Path('runtime-config').mkdir()
+          pathlib.Path('runtime-config/steward-config.php').write_text(steward, encoding='utf-8')
+          pathlib.Path('runtime-config/gateway-board-config.php').write_text(gateway, encoding='utf-8')
+          PY
+      - name: Deploy tested code and create missing configuration
+        env:
+          STEWARD_FTPS_USERNAME: ${{ secrets.STEWARD_FTPS_USERNAME }}
+          STEWARD_FTPS_PASSWORD: ${{ secrets.STEWARD_FTPS_PASSWORD }}
+          GATEWAY_FTPS_USERNAME: ${{ secrets.GATEWAY_FTPS_USERNAME }}
+          GATEWAY_FTPS_PASSWORD: ${{ secrets.GATEWAY_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_component() {
+            component="$1" user="$2" password="$3"
+            while IFS= read -r file; do
+              curl --fail --silent --show-error --ftp-ssl-reqd --ftp-create-dirs --user "$user:$password" --upload-file "payload/$component/$file" "ftp://ftpcluster.loopia.se/$file"
+            done < "backup/$component/paths.txt"
+          }
+          upload_if_missing() {
+            user="$1" password="$2" remote="$3" local="$4"
+            set +e
+            curl --fail --silent --show-error --ftp-ssl-reqd --user "$user:$password" "ftp://ftpcluster.loopia.se/$remote" --output /dev/null
+            result=$?
+            set -e
+            if [ "$result" -eq 9 ] || [ "$result" -eq 78 ]; then
+              curl --fail --silent --show-error --ftp-ssl-reqd --user "$user:$password" --upload-file "$local" "ftp://ftpcluster.loopia.se/$remote"
+            elif [ "$result" -ne 0 ]; then exit "$result"; fi
+          }
+          deploy_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
+          deploy_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
+          upload_if_missing "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD" config.php runtime-config/steward-config.php
+          upload_if_missing "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD" board-config.php runtime-config/gateway-board-config.php
+      - name: Verify public HTTPS services
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://steward.hrm.se/health | grep -F '"status":"ok"'
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://steward.hrm.se/.well-known/agent-card.json | grep -F '"protocolVersion":"1.0"'
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 https://steward.hrm.se/board.json | grep -F '"schema_version":"1.0"'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --proto '=https' --tlsv1.2 -X POST -H 'Content-Type: application/json' --data '{}' https://approve.hrm.se/api/board-cases)" = 401
