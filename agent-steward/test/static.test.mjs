@@ -44,6 +44,15 @@ test('Board Gateway uses its dedicated database configuration', async () => {
   assert.match(example, /'database'\s*=>/);
 });
 
+test('Gateway bootstrap bypasses stale Loopia PHP opcode cache', async () => {
+  const htaccess = await read('forum-steward/approval-gateway/php/public/.htaccess');
+  const bootstrap = await read('forum-steward/approval-gateway/php/public/bootstrap.php');
+  assert.match(htaccess, /DirectoryIndex bootstrap\.php/);
+  assert.match(htaccess, /RewriteRule \^ bootstrap\.php/);
+  assert.match(bootstrap, /opcache_invalidate\(\$entrypoint, true\)/);
+  assert.match(bootstrap, /require \$entrypoint/);
+});
+
 test('no committed runtime secret configuration is present', async () => {
   const ignore = await read('.gitignore');
   assert.match(ignore, /agent-steward\/php\/resources\/sources\.php/);
