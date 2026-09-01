@@ -39,6 +39,7 @@ test('Board Gateway uses its dedicated database configuration', async () => {
   const entrypoint = await read('forum-steward/approval-gateway/php/public/index.php');
   assert.match(entrypoint, /PdoBoardCaseStore::connect\(\(array\) \(\$boardConfig\['database'\]/);
   assert.doesNotMatch(entrypoint, /PdoBoardCaseStore::connect\(\(array\) \(\$config\['database'\]/);
+  assert.match(entrypoint, /opcache_invalidate\(\$boardConfigFile, true\)/);
   const example = await read('forum-steward/approval-gateway/php/board-config.example.php');
   assert.match(example, /'database'\s*=>/);
 });
