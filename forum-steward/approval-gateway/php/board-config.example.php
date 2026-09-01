@@ -1,5 +1,12 @@
 <?php
 return [
+    'database' => [
+        'host' => 'mysql.example.invalid',
+        'port' => 3306,
+        'name' => 'dedicated_board_database',
+        'user' => 'dedicated_board_user',
+        'password' => 'secret',
+    ],
     'steward_origin' => 'https://steward.hrm.se',
     'gateway_shared_secret' => 'same-dedicated-secret-as-the-public-steward',
     'moderation_callback_secret' => 'same-dedicated-callback-secret-as-the-public-steward',

@@ -62,7 +62,7 @@ try {
             throw new RuntimeException('Invalid Board configuration');
         }
         $boardGateway = new BoardGateway(
-            PdoBoardCaseStore::connect((array) ($config['database'] ?? [])),
+            PdoBoardCaseStore::connect((array) ($boardConfig['database'] ?? [])),
             new BoardCallbackClient((string) ($boardConfig['steward_origin'] ?? ''), (string) ($boardConfig['moderation_callback_secret'] ?? '')),
             (string) ($boardConfig['gateway_shared_secret'] ?? ''),
             (string) ($boardConfig['notification_api_secret'] ?? ''),

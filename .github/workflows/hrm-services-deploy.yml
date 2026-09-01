@@ -146,7 +146,7 @@ jobs:
           import os, pathlib
           def php(value): return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
           steward = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'approval_gateway_origin' => 'https://approve.hrm.se',\n  'approval_gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'rate_limit_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','STEWARD_RATE_LIMIT_SECRET'])
-          gateway = "<?php\nreturn [\n  'steward_origin' => 'https://steward.hrm.se',\n  'gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'notification_api_secret' => %s,\n  'notification_encryption_secret' => %s,\n  'csrf_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','BOARD_NOTIFICATION_API_SECRET','BOARD_NOTIFICATION_ENCRYPTION_SECRET','BOARD_GATEWAY_CSRF_SECRET'])
+          gateway = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'steward_origin' => 'https://steward.hrm.se',\n  'gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'notification_api_secret' => %s,\n  'notification_encryption_secret' => %s,\n  'csrf_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','BOARD_NOTIFICATION_API_SECRET','BOARD_NOTIFICATION_ENCRYPTION_SECRET','BOARD_GATEWAY_CSRF_SECRET'])
           pathlib.Path('runtime-config').mkdir()
           pathlib.Path('runtime-config/steward-config.php').write_text(steward, encoding='utf-8')
           pathlib.Path('runtime-config/gateway-board-config.php').write_text(gateway, encoding='utf-8')
@@ -179,7 +179,7 @@ jobs:
           deploy_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
           deploy_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
           upload_if_missing "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD" config.php runtime-config/steward-config.php
-          upload_if_missing "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD" board-config.php runtime-config/gateway-board-config.php
+          curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" --upload-file runtime-config/gateway-board-config.php ftp://ftpcluster.loopia.se/board-config.php
       - name: Verify public HTTPS services
         shell: bash
         run: |
