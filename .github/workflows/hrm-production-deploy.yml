@@ -105,8 +105,12 @@ jobs:
           mkdir -p backup/files
           : > backup/missing.txt
           find payload -type f -printf '%P\n' | LC_ALL=C sort > backup/paths.txt
+          curl --fail --silent --show-error --ftp-ssl-reqd --list-only \
+            --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+            ftp://ftpcluster.loopia.se/ > /dev/null
           while IFS= read -r file; do
-            mkdir -p "backup/files/$(dirname "$file")"
+            parent="$(dirname "$file")"
+            mkdir -p "backup/files/$parent"
             set +e
             curl --fail --silent --show-error --ftp-ssl-reqd \
               --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
@@ -114,11 +118,22 @@ jobs:
               --output "backup/files/$file"
             result=$?
             set -e
-            if [ "$result" -eq 78 ]; then
+            if [ "$result" -eq 9 ]; then
+              set +e
+              curl --fail --silent --show-error --ftp-ssl-reqd --list-only \
+                --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+                "ftp://ftpcluster.loopia.se/$parent/" > /dev/null
+              parent_result=$?
+              set -e
+              if [ "$parent_result" -ne 9 ] && [ "$parent_result" -ne 78 ]; then
+                exit "$result"
+              fi
+            elif [ "$result" -ne 0 ] && [ "$result" -ne 78 ]; then
+              exit "$result"
+            fi
+            if [ "$result" -eq 9 ] || [ "$result" -eq 78 ]; then
               rm -f "backup/files/$file"
               printf '%s\n' "$file" >> backup/missing.txt
-            elif [ "$result" -ne 0 ]; then
-              exit "$result"
             fi
           done < backup/paths.txt
 
