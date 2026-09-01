@@ -35,7 +35,7 @@ check(json_decode($duplicate->body,true)['created']===false,'duplicate Board cas
 $notifications=$gateway->handle(new Request('POST','/api/board-notifications',['authorization'=>'Bearer '.str_repeat('n',32)]));
 $notificationData=json_decode($notifications->body,true);
 check($notifications->status===200&&count($notificationData['items'])===1&&str_contains($notificationData['items'][0]['links']['approve'],'/b/approve/'),'authorized notification claim returns one encrypted capability link');
-$notificationsAgain=$gateway->handle(new Request('POST','/api/board-notifications',['authorization'=>'Bearer '.str_repeat('n',32)]));
+$notificationsAgain=$gateway->handle(new Request('POST','/api/board-notifications',['x-hrm-board-authorization'=>'Bearer '.str_repeat('n',32)]));
 check(count(json_decode($notificationsAgain->body,true)['items'])===1,'unconfirmed notification remains available after retrieval');
 $notificationKey=$notificationData['items'][0]['notification_key'];
 $completeBody=json_encode(['operation'=>'complete','notification_keys'=>[$notificationKey]],JSON_THROW_ON_ERROR);

@@ -209,7 +209,8 @@ final class BoardGateway
 
     private function notifications(Request $request): Response
     {
-        if (!str_starts_with($request->header('authorization'), 'Bearer ') || !hash_equals($this->notificationApiSecret, substr($request->header('authorization'), 7))) return $this->json(['error'=>'unauthorized'], 401);
+        $authorization = $request->header('x-hrm-board-authorization') ?: $request->header('authorization');
+        if (!str_starts_with($authorization, 'Bearer ') || !hash_equals($this->notificationApiSecret, substr($authorization, 7))) return $this->json(['error'=>'unauthorized'], 401);
         try {
             $payload = $request->body === '' ? [] : json_decode($request->body, true, flags: JSON_THROW_ON_ERROR);
             $operation = is_array($payload) && is_string($payload['operation'] ?? null) ? $payload['operation'] : 'claim';

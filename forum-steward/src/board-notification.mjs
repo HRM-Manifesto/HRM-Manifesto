@@ -26,9 +26,9 @@ export function buildBoardModerationEmail(items, recipient) {
 
 export async function sendBoardModerationNotifications({ environment = process.env, fetchImpl = fetch, transportFactory = nodemailer.createTransport } = {}) {
   const origin = safeLine(environment.HRM_APPROVAL_GATEWAY_URL, "HRM_APPROVAL_GATEWAY_URL");
-  if (origin !== "https://approve.hrm.se") throw new Error("Unexpected Approval Gateway origin");
+  if (!["https://approve.hrm.se", "https://approve.hrm.se/board.php"].includes(origin)) throw new Error("Unexpected Approval Gateway origin");
   const secret = safeLine(environment.BOARD_NOTIFICATION_API_SECRET, "BOARD_NOTIFICATION_API_SECRET", 10_000);
-  const headers = { Authorization: `Bearer ${secret}`, Accept: "application/json", "Content-Type": "application/json" };
+  const headers = { Authorization: `Bearer ${secret}`, "X-HRM-Board-Authorization": `Bearer ${secret}`, Accept: "application/json", "Content-Type": "application/json" };
   const response = await fetchImpl(`${origin}/api/board-notifications`, { method: "POST", headers, body: JSON.stringify({ operation: "claim" }), redirect: "error", signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error(`Board notification API failed with status ${response.status}`);
   const payload = await response.json();
