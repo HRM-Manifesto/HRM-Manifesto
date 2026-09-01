@@ -29,6 +29,10 @@ if (!is_file($configFile) || !is_readable($configFile)) {
 try {
     $config = require $configFile;
     $boardConfigFile = $root . '/board-config.php';
+    clearstatcache(true, $boardConfigFile);
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($boardConfigFile, true);
+    }
     $boardConfig = is_file($boardConfigFile) && is_readable($boardConfigFile) ? require $boardConfigFile : [];
     if (!is_array($config)) {
         throw new RuntimeException('Invalid configuration');
