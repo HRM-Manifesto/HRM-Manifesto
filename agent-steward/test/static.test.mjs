@@ -53,13 +53,23 @@ test('Gateway bootstrap bypasses stale Loopia PHP opcode cache', async () => {
   assert.match(bootstrap, /\$_SERVER\['REQUEST_URI'\]/);
   assert.match(bootstrap, /opcache_invalidate\(\$entrypoint, true\)/);
   assert.match(bootstrap, /require \$entrypoint/);
-  assert.match(notificationWorkflow, /HRM_APPROVAL_GATEWAY_URL: https:\/\/approve\.hrm\.se\/bootstrap\.php/);
+  assert.match(notificationWorkflow, /HRM_APPROVAL_GATEWAY_URL: https:\/\/approve\.hrm\.se\/board\.php/);
+});
+
+test('dedicated Board API reads rotatable JSON configuration outside opcode cache', async () => {
+  const boardApi = await read('forum-steward/approval-gateway/php/public/board.php');
+  const workflow = await read('.github/workflows/hrm-services-deploy.yml');
+  assert.match(boardApi, /file_get_contents\(\$root \. '\/board-config\.json'\)/);
+  assert.match(boardApi, /PdoBoardCaseStore::connect\(\(array\) \(\$boardConfig\['database'\]/);
+  assert.match(workflow, /gateway-board-config\.json/);
+  assert.match(workflow, /ftp:\/\/ftpcluster\.loopia\.se\/board-config\.json/);
 });
 
 test('no committed runtime secret configuration is present', async () => {
   const ignore = await read('.gitignore');
   assert.match(ignore, /agent-steward\/php\/resources\/sources\.php/);
   assert.match(ignore, /board-config\.php/);
+  assert.match(ignore, /board-config\.json/);
   const examples = (await read('agent-steward/php/config.example.php')) + (await read('forum-steward/approval-gateway/php/board-config.example.php'));
   assert.doesNotMatch(examples, /sk-proj-|BEGIN (?:RSA )?PRIVATE KEY|password'\s*=>\s*'[^']{20,}'/);
 });

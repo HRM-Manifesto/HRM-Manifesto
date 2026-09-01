@@ -6,3 +6,4 @@ forum-steward/approval-gateway/php/private/
 /agent-steward/php/resources/sources.php
 /agent-steward/test/.venv/
 /forum-steward/approval-gateway/php/board-config.php
+/forum-steward/approval-gateway/php/board-config.json
