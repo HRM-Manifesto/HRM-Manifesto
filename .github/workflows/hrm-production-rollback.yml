@@ -1,0 +1,75 @@
+name: HRM Production Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_run_id:
+        description: Run ID of HRM Production Deploy to restore
+        required: true
+        type: string
+      confirmation:
+        description: Type ROLLBACK HRM exactly
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: hrm-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Restore exact pre-deployment files
+    if: inputs.confirmation == 'ROLLBACK HRM'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: hrm-production
+    steps:
+      - name: Download selected rollback artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hrm-production-backup-${{ inputs.deploy_run_id }}
+          path: backup
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.deploy_run_id }}
+
+      - name: Validate rollback manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s backup/paths.txt
+          while IFS= read -r file; do
+            case "$file" in
+              ''|/*|*'..'*|*'\\'*) exit 1 ;;
+            esac
+          done < backup/paths.txt
+
+      - name: Restore previous files
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            if grep -Fxq "$file" backup/missing.txt; then
+              curl --fail --silent --show-error --ftp-ssl-reqd \
+                --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+                --quote "DELE /$file" \
+                ftp://ftpcluster.loopia.se/ || true
+            else
+              curl --fail --silent --show-error --ftp-ssl-reqd --ftp-create-dirs \
+                --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+                --upload-file "backup/files/$file" \
+                "ftp://ftpcluster.loopia.se/$file"
+            fi
+          done < backup/paths.txt
+
+      - name: Verify public HTTPS after rollback
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            https://hrm.se/ > /dev/null

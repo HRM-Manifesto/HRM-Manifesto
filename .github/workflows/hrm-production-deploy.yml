@@ -1,0 +1,159 @@
+name: HRM Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Deploy a harmless probe or the reviewed allowlist
+        required: true
+        default: probe
+        type: choice
+        options:
+          - probe
+          - production
+      confirmation:
+        description: Type PROBE for probe mode or DEPLOY HRM for production
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrm-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test and protect HRM Version 1.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out reviewed code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install locked Forum Steward dependencies
+        run: npm ci --ignore-scripts --prefix forum-steward
+
+      - name: Run existing repository tests
+        run: npm test --prefix forum-steward
+
+      - name: Test deployment guard
+        run: node --test deployment/test/deployment.test.mjs
+
+      - name: Verify protected historical checksums
+        shell: bash
+        run: sha256sum --check integrity/SHA256SUMS.txt
+
+      - name: Build reviewed static payload
+        if: inputs.mode == 'production'
+        run: node deployment/build-static-deploy.mjs
+
+      - name: Build harmless deployment probe
+        if: inputs.mode == 'probe'
+        shell: bash
+        run: |
+          test "${{ inputs.confirmation }}" = "PROBE"
+          mkdir -p deployment/dist/.well-known
+          printf 'HRM deployment probe\nrun=%s\ncommit=%s\n' \
+            "${{ github.run_id }}" "${{ github.sha }}" \
+            > deployment/dist/.well-known/hrm-deployment-probe.txt
+
+      - name: Validate production confirmation
+        if: inputs.mode == 'production'
+        shell: bash
+        run: test "${{ inputs.confirmation }}" = "DEPLOY HRM"
+
+      - name: Upload tested payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-tested-payload-${{ github.run_id }}
+          path: deployment/dist/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  deploy:
+    name: Backup and deploy over verified FTPS
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: hrm-production
+    steps:
+      - name: Download tested payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hrm-tested-payload-${{ github.run_id }}
+          path: payload
+
+      - name: Require deployment secrets
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          test -n "$LOOPIA_FTPS_USERNAME"
+          test -n "$LOOPIA_FTPS_PASSWORD"
+
+      - name: Back up exact production targets
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup/files
+          : > backup/missing.txt
+          find payload -type f -printf '%P\n' | LC_ALL=C sort > backup/paths.txt
+          while IFS= read -r file; do
+            mkdir -p "backup/files/$(dirname "$file")"
+            set +e
+            curl --fail --silent --show-error --ftp-ssl-reqd \
+              --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+              "ftp://ftpcluster.loopia.se/$file" \
+              --output "backup/files/$file"
+            result=$?
+            set -e
+            if [ "$result" -eq 78 ]; then
+              rm -f "backup/files/$file"
+              printf '%s\n' "$file" >> backup/missing.txt
+            elif [ "$result" -ne 0 ]; then
+              exit "$result"
+            fi
+          done < backup/paths.txt
+
+      - name: Save rollback artifact before deployment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-production-backup-${{ github.run_id }}
+          path: backup/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+
+      - name: Deploy tested payload
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            curl --fail --silent --show-error --ftp-ssl-reqd --ftp-create-dirs \
+              --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+              --upload-file "payload/$file" \
+              "ftp://ftpcluster.loopia.se/$file"
+          done < backup/paths.txt
+
+      - name: Verify public HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.mode }}" = "probe" ]; then
+            expected="run=${{ github.run_id }}"
+            curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+              https://hrm.se/.well-known/hrm-deployment-probe.txt | grep -F "$expected"
+          else
+            curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+              https://hrm.se/agents.txt > /dev/null
+          fi
