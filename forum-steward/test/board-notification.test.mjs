@@ -13,13 +13,16 @@ test("Board moderation email clearly labels identity and requires an approval li
 
 test("empty notification queue sends no email", async () => {
   let sends = 0;
+  let observed;
   const result = await sendBoardModerationNotifications({
-    environment: { HRM_APPROVAL_GATEWAY_URL: "https://approve.hrm.se", BOARD_NOTIFICATION_API_SECRET: "n".repeat(32) },
-    fetchImpl: async () => ({ ok: true, json: async () => ({ items: [] }) }),
+    environment: { HRM_APPROVAL_GATEWAY_URL: "https://approve.hrm.se/board.php", BOARD_NOTIFICATION_API_SECRET: "n".repeat(32) },
+    fetchImpl: async (url, options) => { observed = { url, options }; return { ok: true, json: async () => ({ items: [] }) }; },
     transportFactory: () => ({ sendMail: async () => { sends++; } }),
   });
   assert.deepEqual(result, { sent: false, count: 0 });
   assert.equal(sends, 0);
+  assert.equal(observed.url, "https://approve.hrm.se/board.php/api/board-notifications");
+  assert.equal(observed.options.headers["X-HRM-Board-Authorization"], `Bearer ${"n".repeat(32)}`);
 });
 
 test("notification is completed only after the moderation email is sent", async () => {
