@@ -42,6 +42,18 @@ preg_match('/name="csrf" value="([^"]+)"/',$loginPage->body,$csrfMatch);$loginCs
 $login=$gateway->handle(new Request('POST','/panel/login',['origin'=>'https://approve.hrm.se','content-type'=>'application/x-www-form-urlencoded','user-agent'=>'test'],http_build_query(['csrf'=>$loginCsrf,'password'=>'bezpieczne hasło panelu']),['hrm_board_login_csrf'=>$loginCsrf],[],'127.0.0.1'));
 $sessionCookie=headerValue($login->headers,'Set-Cookie');preg_match('/hrm_board_admin=([^;]+)/',$sessionCookie,$sessionMatch);$session=$sessionMatch[1]??'';
 adminCheck($login->status===303&&$session!==''&&headerValue($login->headers,'Location')==='/panel','valid password creates private session');
+$browserLoginPage=$gateway->handle(new Request('GET','/panel'));
+preg_match('/name="csrf" value="([^"]+)"/',$browserLoginPage->body,$browserCsrfMatch);$browserCsrf=$browserCsrfMatch[1]??'';
+$browserLogin=$gateway->handle(new Request('POST','/panel/login',['host'=>'approve.hrm.se','sec-fetch-site'=>'same-origin','content-type'=>'application/x-www-form-urlencoded','user-agent'=>'browser'],http_build_query(['csrf'=>$browserCsrf,'password'=>'bezpieczne hasło panelu']),['hrm_board_login_csrf'=>$browserCsrf],[],'127.0.0.1'));
+adminCheck($browserLogin->status===303&&str_contains(headerValue($browserLogin->headers,'Set-Cookie'),'hrm_board_admin='),'same-origin browser login works when Origin header is absent');
+$wrongPasswordPage=$gateway->handle(new Request('GET','/panel'));
+preg_match('/name="csrf" value="([^"]+)"/',$wrongPasswordPage->body,$wrongPasswordCsrfMatch);$wrongPasswordCsrf=$wrongPasswordCsrfMatch[1]??'';
+$wrongPassword=$gateway->handle(new Request('POST','/panel/login',['host'=>'approve.hrm.se','sec-fetch-site'=>'same-origin','content-type'=>'application/x-www-form-urlencoded','user-agent'=>'browser'],http_build_query(['csrf'=>$wrongPasswordCsrf,'password'=>'definitely-wrong']),['hrm_board_login_csrf'=>$wrongPasswordCsrf],[],'127.0.0.1'));
+adminCheck($wrongPassword->status===200&&str_contains($wrongPassword->body,'Nieprawidłowe hasło')&&!str_contains(headerValue($wrongPassword->headers,'Set-Cookie'),'hrm_board_admin='),'wrong browser password is rejected without a session');
+$wrongHostPage=$gateway->handle(new Request('GET','/panel'));
+preg_match('/name="csrf" value="([^"]+)"/',$wrongHostPage->body,$wrongHostCsrfMatch);$wrongHostCsrf=$wrongHostCsrfMatch[1]??'';
+$wrongHost=$gateway->handle(new Request('POST','/panel/login',['host'=>'evil.invalid','sec-fetch-site'=>'same-origin','content-type'=>'application/x-www-form-urlencoded'],http_build_query(['csrf'=>$wrongHostCsrf,'password'=>'bezpieczne hasło panelu']),['hrm_board_login_csrf'=>$wrongHostCsrf]));
+adminCheck($wrongHost->status===403,'missing Origin fallback rejects a different host');
 $panel=$gateway->handle(new Request('GET','/panel',[], '', ['hrm_board_admin'=>$session],['tab'=>'new']));
 adminCheck($panel->status===200&&str_contains($panel->body,'DO PRZEMYŚLENIA')&&str_contains($panel->body,'AI: WARTO PRZEMYŚLEĆ'),'panel renders primary moderation flow');
 adminCheck(!str_contains($panel->body,'<script>alert(1)</script>')&&str_contains($panel->body,'&lt;script&gt;'),'panel escapes untrusted message HTML');

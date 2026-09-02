@@ -599,7 +599,18 @@ final class BoardAdminGateway
 
     private function sameOrigin(Request $request): bool
     {
-        return hash_equals(rtrim($this->publicOrigin, '/'), $request->header('origin'));
+        $expectedOrigin = rtrim($this->publicOrigin, '/');
+        $origin = trim($request->header('origin'));
+        if ($origin !== '') {
+            return hash_equals($expectedOrigin, $origin);
+        }
+
+        $expectedHost = strtolower((string) parse_url($expectedOrigin, PHP_URL_HOST));
+        $requestHost = strtolower(preg_replace('/:\d+$/', '', trim($request->header('host'))) ?? '');
+        $fetchSite = strtolower(trim($request->header('sec-fetch-site')));
+        return $expectedHost !== ''
+            && hash_equals($expectedHost, $requestHost)
+            && ($fetchSite === '' || $fetchSite === 'same-origin');
     }
 
     private function createSession(): string
