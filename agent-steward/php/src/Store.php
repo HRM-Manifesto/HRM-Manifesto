@@ -16,7 +16,7 @@ interface StewardStore
     public function moderateSubmission(string $id, string $decision, int $now): bool;
     public function publishedBoard(int $limit): array;
     public function rateLimit(string $bucket, string $subjectHash, int $windowStart, int $limit): bool;
-    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null): void;
+    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null, ?array $successRateLimit = null): void;
     public function getKnowledgeCapsule(string $capsuleId): ?array;
     public function recordKnowledgeCapsuleEvent(string $capsuleId, string $eventKind, ?string $relatedCapsuleId, int $createdAt): void;
     public function knowledgeCapsuleLineage(string $capsuleId): ?array;
@@ -186,7 +186,7 @@ final class PdoStewardStore implements StewardStore
         }
     }
 
-    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null): void
+    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null, ?array $successRateLimit = null): void
     {
         $previousId = $capsule['previous_capsule_id'] ?? null;
         if (!in_array($submissionMethod, ['direct_https', 'a2a', 'human_relay', 'system_test'], true)) {
@@ -194,6 +194,17 @@ final class PdoStewardStore implements StewardStore
         }
         if ($submissionMethod === 'direct_https' && ($previousId === null || !is_string($continuationTokenHash) || preg_match('/^[a-f0-9]{64}$/', $continuationTokenHash) !== 1)) {
             throw new RuntimeException('invalid_continuation_token');
+        }
+        if ($successRateLimit !== null && (
+            !is_string($successRateLimit['bucket'] ?? null)
+            || preg_match('/^[a-z0-9_]{1,30}$/', $successRateLimit['bucket']) !== 1
+            || !is_string($successRateLimit['subject_hash'] ?? null)
+            || preg_match('/^[a-f0-9]{64}$/', $successRateLimit['subject_hash']) !== 1
+            || !is_int($successRateLimit['window_start'] ?? null)
+            || !is_int($successRateLimit['limit'] ?? null)
+            || $successRateLimit['limit'] < 1
+        )) {
+            throw new RuntimeException('invalid_rate_limit');
         }
         $this->pdo->beginTransaction();
         try {
@@ -213,6 +224,15 @@ final class PdoStewardStore implements StewardStore
                         throw new RuntimeException('continuation_token_used');
                     }
                     throw $error;
+                }
+            }
+            if ($successRateLimit !== null) {
+                $limited = $this->pdo->prepare('INSERT INTO hrm_rate_limits (bucket, subject_hash, window_start, hits) VALUES (?, ?, ?, 1) ON DUPLICATE KEY UPDATE hits = hits + 1');
+                $limited->execute([$successRateLimit['bucket'], $successRateLimit['subject_hash'], $successRateLimit['window_start']]);
+                $hits = $this->pdo->prepare('SELECT hits FROM hrm_rate_limits WHERE bucket = ? AND subject_hash = ? AND window_start = ? FOR UPDATE');
+                $hits->execute([$successRateLimit['bucket'], $successRateLimit['subject_hash'], $successRateLimit['window_start']]);
+                if ((int) $hits->fetchColumn() > $successRateLimit['limit']) {
+                    throw new RuntimeException('rate_limited');
                 }
             }
             $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsules (capsule_id, previous_capsule_id, protocol_version, capsule_json, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))');

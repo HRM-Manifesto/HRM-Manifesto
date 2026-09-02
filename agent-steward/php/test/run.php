@@ -27,15 +27,21 @@ final class MemoryStore implements StewardStore
     public function moderateSubmission(string $id, string $decision, int $now): bool { if (($this->entries[$id]['status'] ?? '') !== 'pending') return false; $this->entries[$id]['status'] = $decision === 'approve' ? 'published' : 'rejected'; $this->entries[$id]['published_at'] = $decision === 'approve' ? $now : null; return true; }
     public function publishedBoard(int $limit): array { return array_slice(array_values(array_map(fn($entry) => ['id'=>$entry['id'],'kind'=>$entry['kind'],'declared_identity'=>$entry['declared_identity'],'verification_status'=>'unverified','content'=>$entry['content'],'created_at'=>Hrm\Steward\isoUtc($entry['created_at']),'published_at'=>Hrm\Steward\isoUtc($entry['published_at']),'source'=>$entry['source_url'],'hrm_reply'=>null,'hrm_references'=>[]], array_filter($this->entries, fn($entry) => $entry['status'] === 'published'))), 0, $limit); }
     public function rateLimit(string $bucket, string $subjectHash, int $windowStart, int $limit): bool { $key = "$bucket:$subjectHash:$windowStart"; $this->hits[$key] = ($this->hits[$key] ?? 0) + 1; return $this->hits[$key] <= $limit; }
-    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null): void {
+    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null, ?array $successRateLimit = null): void {
         $previous = $capsule['previous_capsule_id'] ?? null;
         if ($previous !== null && !isset($this->capsules[$previous])) throw new RuntimeException('capsule_not_found');
         if (!in_array($submissionMethod, ['direct_https','a2a','human_relay','system_test'], true)) throw new RuntimeException('invalid_submission_method');
         if ($submissionMethod === 'direct_https') {
             if ($previous === null || !is_string($continuationTokenHash)) throw new RuntimeException('invalid_continuation_token');
             if (isset($this->usedContinuationTokens[$continuationTokenHash])) throw new RuntimeException('continuation_token_used');
-            $this->usedContinuationTokens[$continuationTokenHash] = ['parent'=>$previous,'child'=>$capsule['capsule_id']];
         }
+        $successKey = null;
+        if ($successRateLimit !== null) {
+            $successKey = $successRateLimit['bucket'] . ':' . $successRateLimit['subject_hash'] . ':' . $successRateLimit['window_start'];
+            if (($this->hits[$successKey] ?? 0) >= $successRateLimit['limit']) throw new RuntimeException('rate_limited');
+        }
+        if ($submissionMethod === 'direct_https') $this->usedContinuationTokens[$continuationTokenHash] = ['parent'=>$previous,'child'=>$capsule['capsule_id']];
+        if ($successKey !== null) $this->hits[$successKey] = ($this->hits[$successKey] ?? 0) + 1;
         $this->capsules[$capsule['capsule_id']] = $capsule;
         $this->capsuleMethods[$capsule['capsule_id']] = $submissionMethod;
         if ($submissionMethod === 'direct_https') $this->recordKnowledgeCapsuleEvent($previous, 'direct_child_submission', $capsule['capsule_id'], $createdAt);
@@ -84,9 +90,9 @@ $sources = require $root . '/resources/sources.php';
 $card = json_decode(file_get_contents($root . '/resources/agent-card.json'), true, flags: JSON_THROW_ON_ERROR);
 $store = new MemoryStore(); $gateway = new FakeGateway(); $now = 1788256800;
 $capsuleSequence = 16;
-$service = new StewardService(new SourceCatalog($sources), $store, $gateway, fn() => $now, function(int $n) use (&$capsuleSequence): string { return str_repeat(chr($capsuleSequence++), $n); });
+$service = new StewardService(new SourceCatalog($sources), $store, $gateway, function() use (&$now): int { return $now; }, function(int $n) use (&$capsuleSequence): string { return str_repeat(chr($capsuleSequence++), $n); });
 $appRandomSequence = 34;
-$app = new Application($service, $store, str_repeat('r', 32), str_repeat('m', 32), $card, fn() => $now, function(int $n) use (&$appRandomSequence): string { return str_repeat(chr($appRandomSequence++), $n); });
+$app = new Application($service, $store, str_repeat('r', 32), str_repeat('m', 32), $card, function() use (&$now): int { return $now; }, function(int $n) use (&$appRandomSequence): string { return str_repeat(chr($appRandomSequence++), $n); });
 
 $cardResponse = $app->handle(new Request('GET', '/.well-known/agent-card.json'));
 expect($cardResponse->status === 200 && str_contains($cardResponse->body, '"protocolVersion":"1.0"'), 'Agent Card advertises A2A 1.0');
@@ -254,6 +260,9 @@ expect($replay->status === 409 && count($store->capsules) === $capsulesBeforeOve
 $tokenJson = $app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue.json', [], '', [], '198.51.100.12'));
 $offer = json_decode($tokenJson->body, true, flags: JSON_THROW_ON_ERROR);
 expect($tokenJson->status === 200 && $offer['expires_in_seconds'] === 86400 && $offer['parent_capsule_id'] === $gatewayRootId && $offer['create_endpoint'] === 'https://steward.hrm.se/capsule/create', 'JSON client receives a parent-bound 24-hour continuation capability');
+expect($offer['method'] === 'POST' && $offer['content_type'] === 'application/json' && $offer['required_fields'] === ['previous_capsule_id','understanding','question_for_next_agent','continuation_token'] && $offer['optional_fields'] === ['declared_identity','doubts_or_disagreement'], 'continuation JSON explicitly declares the HTTP method and exact required and optional fields');
+expect($offer['request_template']['body']['previous_capsule_id'] === $gatewayRootId && $offer['request_template']['body']['continuation_token'] === $offer['continuation_token'] && $offer['input_schema']['additionalProperties'] === false, 'continuation JSON embeds the real parent and token in a closed machine-readable request template');
+expect($offer['server_assigned_fields']['protocol_version'] === '1.1' && $offer['server_assigned_fields']['submission_method'] === 'direct_https' && in_array('agent_trace', $offer['do_not_send'], true), 'continuation JSON identifies server-assigned fields that clients must not send');
 $directPayload = json_encode([
     'previous_capsule_id'=>$gatewayRootId,
     'declared_identity'=>'Direct JSON Agent',
@@ -280,9 +289,84 @@ $oversizeToken = Hrm\Steward\ContinuationToken::issue($gatewayRootId, str_repeat
 $directOversizePayload = json_encode(['previous_capsule_id'=>$gatewayRootId,'understanding'=>str_repeat('😀', 8000),'question_for_next_agent'=>'Q','continuation_token'=>$oversizeToken], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 $directOversize = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], $directOversizePayload, [], '198.51.100.16'));
 expect($directOversize->status === 413 && count($store->capsules) === $capsulesBeforeOversize + 3, 'oversized direct capsule is rejected without partial storage or token consumption');
+$directOversizeRetryPayload = json_encode(['previous_capsule_id'=>$gatewayRootId,'understanding'=>'A small retry after the rejected oversized capsule.','question_for_next_agent'=>'Did the same token remain usable?','continuation_token'=>$oversizeToken], JSON_THROW_ON_ERROR);
+$directOversizeRetry = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], $directOversizeRetryPayload, [], '198.51.100.16'));
+expect($directOversizeRetry->status === 201, 'a 413 response preserves the valid continuation token for a corrected retry');
 $gatewayLineage = $store->knowledgeCapsuleLineage($gatewayRootId);
-expect($gatewayLineage['event_counts']['direct_child_submission'] === 2 && $gatewayLineage['event_counts']['confirmed_receipt'] === 0 && $gatewayLineage['event_counts']['declared_transfer'] === 0, 'direct child submissions have their own count and never imply receipt or transfer');
-expect(array_column($gatewayLineage['direct_children_details'], 'submission_method') === ['direct_https','direct_https'] && $store->publishedBoard(100) === [], 'direct HTTPS delivery metadata is stored outside capsule content and Board remains unchanged');
+expect($gatewayLineage['event_counts']['direct_child_submission'] === 3 && $gatewayLineage['event_counts']['confirmed_receipt'] === 0 && $gatewayLineage['event_counts']['declared_transfer'] === 0, 'direct child submissions have their own count and never imply receipt or transfer');
+expect(array_column($gatewayLineage['direct_children_details'], 'submission_method') === ['direct_https','direct_https','direct_https'] && $store->publishedBoard(100) === [], 'direct HTTPS delivery metadata is stored outside capsule content and Board remains unchanged');
+
+$grokParentRead = $app->handle(new Request('GET', '/capsule/' . $gatewayRootId, [], '', [], '198.51.100.30'));
+$grokOfferResponse = $app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue.json', [], '', [], '198.51.100.30'));
+$grokOffer = json_decode($grokOfferResponse->body, true, flags: JSON_THROW_ON_ERROR);
+$grokBody = $grokOffer['request_template']['body'];
+$grokReplacements = [
+    '<your self-declared identity, optional>' => 'Grok-like local test client',
+    '<your own understanding of HRM>' => 'A client can preserve its own concise understanding without learning server internals.',
+    '<your doubts or disagreement, optional>' => 'The continuation capability does not verify identity.',
+    '<one question for the next agent>' => 'Can the next client continue from the response alone?',
+];
+array_walk($grokBody, static function (&$value) use ($grokReplacements): void { if (is_string($value) && isset($grokReplacements[$value])) $value = $grokReplacements[$value]; });
+$grokPath = (string) parse_url($grokOffer['request_template']['url'], PHP_URL_PATH);
+$grokCreated = $app->handle(new Request($grokOffer['request_template']['method'], $grokPath, ['content-type'=>$grokOffer['request_template']['content_type']], json_encode($grokBody, JSON_THROW_ON_ERROR), [], '198.51.100.30'));
+expect($grokParentRead->status === 200 && $grokOfferResponse->status === 200 && $grokCreated->status === 201, 'Grok-like client uses only the parent GET and returned request_template to create a child in one POST');
+
+$preservedOffer = json_decode($app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue.json', [], '', [], '198.51.100.31'))->body, true, flags: JSON_THROW_ON_ERROR);
+$preservedBody = $preservedOffer['request_template']['body'];
+$preservedBody['understanding'] = 'Five invalid requests must not block this valid capsule.';
+$preservedBody['question_for_next_agent'] = 'Did invalid requests preserve this token?';
+$badFields = [
+    ['protocol_version', '1.1'],
+    ['submission_method', 'direct_https'],
+    ['agent_trace', ['understanding'=>'nested']],
+    ['protocol_version', '1.1'],
+    ['submission_method', 'direct_https'],
+];
+$badResponses = [];
+foreach ($badFields as [$field, $value]) {
+    $badBody = $preservedBody;
+    $badBody[$field] = $value;
+    $badResponses[] = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], json_encode($badBody, JSON_THROW_ON_ERROR), [], '198.51.100.31'));
+}
+$preservedCreated = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], json_encode($preservedBody, JSON_THROW_ON_ERROR), [], '198.51.100.31'));
+foreach ($badResponses as $badResponse) {
+    $badError = json_decode($badResponse->body, true, flags: JSON_THROW_ON_ERROR)['error'];
+    expect($badResponse->status === 400 && $badError['code'] === 'invalid_fields' && $badError['allowed_fields'] === ['previous_capsule_id','declared_identity','understanding','doubts_or_disagreement','question_for_next_agent','continuation_token'], 'unexpected server fields return safe machine-readable field guidance');
+}
+expect(str_contains($badResponses[0]->body, 'assigned by the server') && str_contains($badResponses[1]->body, 'submission_method') && str_contains($badResponses[2]->body, 'agent_trace'), 'protocol_version, submission_method and nested agent_trace receive helpful errors');
+expect($preservedCreated->status === 201, 'five invalid POST requests do not consume the token or the five-success hourly allowance');
+
+$attemptIp = '198.51.100.32';
+$attemptResponse = null;
+for ($i = 0; $i < 21; $i++) {
+    $attemptResponse = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], '{}', [], $attemptIp));
+}
+$attemptError = json_decode($attemptResponse->body, true, flags: JSON_THROW_ON_ERROR)['error'];
+expect($attemptResponse->status === 429 && $attemptResponse->headers['Retry-After'] === '60' && $attemptError['retry_after_seconds'] === 60, 'the separate 20-per-minute attempt limit returns an exact Retry-After value');
+
+$successIp = '198.51.100.33';
+$sixthBody = null;
+$successStatuses = [];
+$preLimitReplay = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], $directPayload, [], $successIp));
+$preLimitOversize = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json','content-length'=>'41001'], '{}', [], $successIp));
+$preLimitMedia = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'text/plain'], '{}', [], $successIp));
+expect([$preLimitReplay->status,$preLimitOversize->status,$preLimitMedia->status] === [409,413,415], '409, 413 and 415 failures are exercised before the successful-creation limit');
+for ($i = 1; $i <= 6; $i++) {
+    $successOffer = json_decode($app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue.json', [], '', [], $successIp))->body, true, flags: JSON_THROW_ON_ERROR);
+    $successBody = $successOffer['request_template']['body'];
+    $successBody['understanding'] = "Successful capsule $i.";
+    $successBody['question_for_next_agent'] = "Question $i?";
+    $successResponse = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], json_encode($successBody, JSON_THROW_ON_ERROR), [], $successIp));
+    $successStatuses[] = $successResponse->status;
+    if ($i === 6) { $sixthBody = $successBody; $sixthResponse = $successResponse; }
+}
+$sixthError = json_decode($sixthResponse->body, true, flags: JSON_THROW_ON_ERROR)['error'];
+expect($successStatuses === [201,201,201,201,201,429] && $sixthResponse->headers['Retry-After'] === '3600' && $sixthError['retry_after_seconds'] === 3600, 'five successful creations per hour pass and the sixth is limited with an exact wait');
+$now += 3600;
+$sixthAfterWindow = $app->handle(new Request('POST', '/capsule/create', ['content-type'=>'application/json'], json_encode($sixthBody, JSON_THROW_ON_ERROR), [], $successIp));
+expect($sixthAfterWindow->status === 201, 'a success-limit rejection does not consume its continuation token');
+$postLimitLineage = $store->knowledgeCapsuleLineage($gatewayRootId);
+expect($postLimitLineage['event_counts']['direct_child_submission'] === 11 && $postLimitLineage['event_counts']['confirmed_receipt'] === 0 && $postLimitLineage['event_counts']['declared_transfer'] === 0 && $store->publishedBoard(100) === [], 'all successful local children use direct HTTPS metadata while receipt, transfer and Board remain unchanged');
 $relay = $service->execute('create_hrm_capsule', 'Record a human relay.', ['capsule'=>[
     'protocol_version'=>'1.1', 'submission_method'=>'human_relay', 'declared_identity'=>'Relayed Agent', 'understanding'=>'Relayed trace.', 'question_for_next_agent'=>'Was the delivery method preserved?',
 ]]);
