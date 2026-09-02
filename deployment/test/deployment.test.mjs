@@ -39,3 +39,13 @@ test('service payload builder maps web roots and excludes runtime secrets', asyn
   assert.match(script, /Forbidden runtime or secret file/);
   assert.match(script, /config\|board-config/);
 });
+
+test('service deployment backs up private Board data before code deployment', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const workflow = await readFile(path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'hrm-services-deploy.yml'), 'utf8');
+  assert.match(workflow, /Back up private Board data before deployment/);
+  assert.match(workflow, /mariadb-dump/);
+  assert.match(workflow, /hrm_board_entries hrm_board_approval_cases/);
+  assert.ok(workflow.indexOf('Back up private Board data before deployment') < workflow.indexOf('Deploy tested code and create missing configuration'));
+});

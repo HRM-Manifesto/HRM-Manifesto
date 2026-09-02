@@ -42,6 +42,7 @@ jobs:
           php agent-steward/php/test/run.php
           php forum-steward/approval-gateway/php/test/run.php
           php forum-steward/approval-gateway/php/test/board-run.php
+          php forum-steward/approval-gateway/php/test/board-admin-run.php
       - name: Validate Agent Card with official A2A SDK
         run: |
           python -m pip install --disable-pip-version-check --no-input \
@@ -88,10 +89,11 @@ jobs:
           BOARD_GATEWAY_CSRF_SECRET: ${{ secrets.BOARD_GATEWAY_CSRF_SECRET }}
           BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
           BOARD_NOTIFICATION_ENCRYPTION_SECRET: ${{ secrets.BOARD_NOTIFICATION_ENCRYPTION_SECRET }}
+          BOARD_ADMIN_PASSWORD: ${{ secrets.BOARD_ADMIN_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
-          for name in STEWARD_FTPS_USERNAME STEWARD_FTPS_PASSWORD GATEWAY_FTPS_USERNAME GATEWAY_FTPS_PASSWORD STEWARD_DB_HOST STEWARD_DB_NAME STEWARD_DB_USER STEWARD_DB_PASSWORD BOARD_GATEWAY_SHARED_SECRET BOARD_MODERATION_CALLBACK_SECRET STEWARD_RATE_LIMIT_SECRET BOARD_GATEWAY_CSRF_SECRET BOARD_NOTIFICATION_API_SECRET BOARD_NOTIFICATION_ENCRYPTION_SECRET; do
+          for name in STEWARD_FTPS_USERNAME STEWARD_FTPS_PASSWORD GATEWAY_FTPS_USERNAME GATEWAY_FTPS_PASSWORD STEWARD_DB_HOST STEWARD_DB_NAME STEWARD_DB_USER STEWARD_DB_PASSWORD BOARD_GATEWAY_SHARED_SECRET BOARD_MODERATION_CALLBACK_SECRET STEWARD_RATE_LIMIT_SECRET BOARD_GATEWAY_CSRF_SECRET BOARD_NOTIFICATION_API_SECRET BOARD_NOTIFICATION_ENCRYPTION_SECRET BOARD_ADMIN_PASSWORD; do
             test -n "${!name}"
           done
       - name: Back up exact code targets without reading runtime secrets
@@ -119,6 +121,24 @@ jobs:
           }
           backup_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
           backup_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
+      - name: Back up private Board data before deployment
+        env:
+          STEWARD_DB_HOST: ${{ secrets.STEWARD_DB_HOST }}
+          STEWARD_DB_NAME: ${{ secrets.STEWARD_DB_NAME }}
+          STEWARD_DB_USER: ${{ secrets.STEWARD_DB_USER }}
+          STEWARD_DB_PASSWORD: ${{ secrets.STEWARD_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y mariadb-client php-cli >/dev/null
+          mkdir -p backup/gateway/database
+          MYSQL_PWD="$STEWARD_DB_PASSWORD" mariadb-dump \
+            --host="$STEWARD_DB_HOST" --user="$STEWARD_DB_USER" \
+            --single-transaction --skip-comments --no-tablespaces \
+            "$STEWARD_DB_NAME" hrm_board_entries hrm_board_approval_cases \
+            | gzip -9 > backup/gateway/database/board-before-deploy.sql.gz
+          test -s backup/gateway/database/board-before-deploy.sql.gz
       - name: Save code rollback artifact before deployment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -139,14 +159,16 @@ jobs:
           BOARD_GATEWAY_CSRF_SECRET: ${{ secrets.BOARD_GATEWAY_CSRF_SECRET }}
           BOARD_NOTIFICATION_API_SECRET: ${{ secrets.BOARD_NOTIFICATION_API_SECRET }}
           BOARD_NOTIFICATION_ENCRYPTION_SECRET: ${{ secrets.BOARD_NOTIFICATION_ENCRYPTION_SECRET }}
+          BOARD_ADMIN_PASSWORD: ${{ secrets.BOARD_ADMIN_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
+          export BOARD_ADMIN_PASSWORD_HASH="$(php -r 'echo password_hash(getenv("BOARD_ADMIN_PASSWORD"), PASSWORD_DEFAULT);')"
           python - <<'PY'
           import json, os, pathlib
           def php(value): return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
           steward = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'approval_gateway_origin' => 'https://approve.hrm.se',\n  'approval_gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'rate_limit_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','STEWARD_RATE_LIMIT_SECRET'])
-          gateway = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'steward_origin' => 'https://steward.hrm.se',\n  'gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'notification_api_secret' => %s,\n  'notification_encryption_secret' => %s,\n  'csrf_secret' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','BOARD_NOTIFICATION_API_SECRET','BOARD_NOTIFICATION_ENCRYPTION_SECRET','BOARD_GATEWAY_CSRF_SECRET'])
+          gateway = "<?php\nreturn [\n  'database' => ['host' => %s, 'port' => 3306, 'name' => %s, 'user' => %s, 'password' => %s],\n  'steward_origin' => 'https://steward.hrm.se',\n  'gateway_shared_secret' => %s,\n  'moderation_callback_secret' => %s,\n  'notification_api_secret' => %s,\n  'notification_encryption_secret' => %s,\n  'csrf_secret' => %s,\n  'admin_password_hash' => %s,\n];\n" % tuple(php(os.environ[k]) for k in ['STEWARD_DB_HOST','STEWARD_DB_NAME','STEWARD_DB_USER','STEWARD_DB_PASSWORD','BOARD_GATEWAY_SHARED_SECRET','BOARD_MODERATION_CALLBACK_SECRET','BOARD_NOTIFICATION_API_SECRET','BOARD_NOTIFICATION_ENCRYPTION_SECRET','BOARD_GATEWAY_CSRF_SECRET','BOARD_ADMIN_PASSWORD_HASH'])
           gateway_json = json.dumps({
               'database': {'host': os.environ['STEWARD_DB_HOST'], 'port': 3306, 'name': os.environ['STEWARD_DB_NAME'], 'user': os.environ['STEWARD_DB_USER'], 'password': os.environ['STEWARD_DB_PASSWORD']},
               'steward_origin': 'https://steward.hrm.se',
@@ -155,6 +177,7 @@ jobs:
               'notification_api_secret': os.environ['BOARD_NOTIFICATION_API_SECRET'],
               'notification_encryption_secret': os.environ['BOARD_NOTIFICATION_ENCRYPTION_SECRET'],
               'csrf_secret': os.environ['BOARD_GATEWAY_CSRF_SECRET'],
+              'admin_password_hash': os.environ['BOARD_ADMIN_PASSWORD_HASH'],
           }, ensure_ascii=False)
           pathlib.Path('runtime-config').mkdir()
           pathlib.Path('runtime-config/steward-config.php').write_text(steward, encoding='utf-8')

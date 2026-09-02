@@ -25,16 +25,17 @@ final class BoardFakeCallback implements BoardCallback { public array $calls=[];
 function check(bool $condition,string $name):void{if(!$condition)throw new RuntimeException("FAILED: $name");echo "PASS $name\n";}
 
 $store=new BoardMemoryStore();$callback=new BoardFakeCallback();$now=1788256800;
-$gateway=new BoardGateway($store,$callback,str_repeat('g',32),str_repeat('n',32),str_repeat('e',32),str_repeat('c',32),'https://approve.hrm.se',fn()=>$now,fn(int $n)=>str_repeat("\x33",$n));
+$gateway=new BoardGateway($store,$callback,str_repeat('g',32),str_repeat('n',32),str_repeat('e',32),str_repeat('c',32),'https://approve.hrm.se',fn()=>$now,fn(int $n)=>str_repeat("\x33",$n),fn(array $item)=>['recommendation'=>'publish','reasoning'=>'Wiadomość wnosi rzeczowy wkład.']);
 $submission=['id'=>'11111111-1111-4111-8111-111111111111','declared_identity'=>'<Self-declared Agent>','verification_status'=>'unverified','kind'=>'critique','content'=>'<script>alert(1)</script> Krytyka','source_url'=>null,'created_at'=>$now];
 $body=json_encode($submission,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);
 $register=$gateway->handle(new Request('POST','/api/board-cases',['authorization'=>'Bearer '.str_repeat('g',32),'content-type'=>'application/json'],$body));
-check($register->status===201&&json_decode($register->body,true)['notification_queued']===true,'Board case registers and queues notification');
+check($register->status===201&&json_decode($register->body,true)['notification_queued']===true,'Board case registers and queues notification (status '.$register->status.', body '.$register->body.')');
 $duplicate=$gateway->handle(new Request('POST','/api/board-cases',['authorization'=>'Bearer '.str_repeat('g',32),'content-type'=>'application/json'],$body));
 check(json_decode($duplicate->body,true)['created']===false,'duplicate Board case is idempotent');
 $notifications=$gateway->handle(new Request('POST','/api/board-notifications',['authorization'=>'Bearer '.str_repeat('n',32)]));
 $notificationData=json_decode($notifications->body,true);
 check($notifications->status===200&&count($notificationData['items'])===1&&str_contains($notificationData['items'][0]['links']['approve'],'/b/approve/'),'authorized notification claim returns one encrypted capability link');
+check(($notificationData['items'][0]['submission']['ai_assessment']['recommendation']??'')==='publish','AI assessment is preserved with the private moderation record');
 $notificationsAgain=$gateway->handle(new Request('POST','/api/board-notifications',['x-hrm-board-authorization'=>'Bearer '.str_repeat('n',32)]));
 check(count(json_decode($notificationsAgain->body,true)['items'])===1,'unconfirmed notification remains available after retrieval');
 $notificationKey=$notificationData['items'][0]['notification_key'];

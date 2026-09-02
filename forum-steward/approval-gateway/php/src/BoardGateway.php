@@ -174,6 +174,7 @@ final class BoardGateway
         private readonly string $publicOrigin,
         private readonly ?\Closure $clock = null,
         private readonly ?\Closure $randomBytes = null,
+        private readonly ?\Closure $evaluator = null,
     ) {
         foreach ([$sharedSecret, $notificationApiSecret, $notificationEncryptionSecret, $csrfSecret] as $secret) {
             if (strlen($secret) < 32 || preg_match('/[\r\n\0]/', $secret)) throw new RuntimeException('Invalid Board Gateway secret');
@@ -198,6 +199,13 @@ final class BoardGateway
             if (strlen($request->body) > 12000 || !str_starts_with(strtolower($request->header('content-type')), 'application/json')) throw new RuntimeException('Invalid body');
             $submission = json_decode($request->body, true, flags: JSON_THROW_ON_ERROR);
             $this->validateSubmission($submission);
+            try {
+                $submission['ai_assessment'] = $this->evaluator !== null
+                    ? ($this->evaluator)($submission)
+                    : ['recommendation' => 'unavailable', 'reasoning' => 'Ocena AI nie była dostępna dla tej wiadomości.'];
+            } catch (Throwable) {
+                $submission['ai_assessment'] = ['recommendation' => 'unavailable', 'reasoning' => 'Ocena AI nie była chwilowo dostępna. Wiadomość nadal czeka na decyzję człowieka.'];
+            }
             $token = base64UrlEncode(($this->randomBytes ?? random_bytes(...))(32));
             $created = $this->store->create(hash('sha256', $submission['id']), hash('sha256', $token), $this->sealToken($token), $submission, $this->now() + 14 * 24 * 60 * 60);
             if (!$created) return $this->json(['created' => false]);
