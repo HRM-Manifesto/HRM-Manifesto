@@ -11,6 +11,8 @@ final class Request
         public readonly array $headers = [],
         public readonly string $body = '',
         public readonly array $cookies = [],
+        public readonly array $query = [],
+        public readonly string $remoteAddress = '',
     ) {}
 
     public static function fromGlobals(): self
@@ -35,6 +37,8 @@ final class Request
             $headers,
             (string) file_get_contents('php://input'),
             array_map('strval', $_COOKIE),
+            array_map('strval', $_GET),
+            (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
         );
     }
 
@@ -76,6 +80,7 @@ function securityHeaders(string $contentType = 'text/html; charset=utf-8'): arra
         'Cross-Origin-Opener-Policy' => 'same-origin',
         'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=()',
         'Referrer-Policy' => 'no-referrer',
+        'X-Robots-Tag' => 'noindex, nofollow, noarchive',
         'X-Content-Type-Options' => 'nosniff',
         'X-Frame-Options' => 'DENY',
     ];

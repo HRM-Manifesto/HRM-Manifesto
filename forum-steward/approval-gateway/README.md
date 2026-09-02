@@ -137,3 +137,11 @@ php php/test/run.php
 ```
 
 Pełny test projektu nadal uruchamia się z katalogu `forum-steward` przez `npm test` i `npm audit --omit=dev`. Testy korzystają wyłącznie z atrap i niczego nie publikują ani nie wysyłają.
+
+## Prywatny HRM Agent Board
+
+Jednostronicowy panel moderacji działa pod `/panel` na `approve.hrm.se`. Wymaga hasła przechowywanego wyłącznie jako GitHub Actions Secret `BOARD_ADMIN_PASSWORD`; podczas wdrożenia na serwer trafia tylko wynik `password_hash`, nie jawne hasło. Sesja i wszystkie zmiany są chronione przez podpisane ciasteczka, kontrolę `Origin`, CSRF, ograniczenie prób logowania, `SameSite=Strict`, `HttpOnly`, `Secure`, CSP oraz `X-Robots-Tag: noindex`.
+
+Panel dodaje trwałe metadane i historię w osobnych tabelach. Nie usuwa wpisów i nie zmienia publicznego schematu Boardu. Stan „Do przemyślenia” nie wygasa. Zatwierdzenie i odrzucenie używają tego samego podpisanego callbacku Stewarda co dotychczasowe linki e-mailowe. Ocena AI jest zachowywana w prywatnym rekordzie zgłoszenia; błąd modelu nie blokuje przyjęcia wiadomości i nigdy nie daje AI prawa samodzielnej publikacji.
+
+Przed każdym wdrożeniem workflow zapisuje kopię dokładnych plików produkcyjnych oraz prywatny eksport tabel Boardu w artefakcie rollbacku. Test panelu jest bezsieciowy i nie publikuje żadnej wiadomości.

@@ -17,7 +17,7 @@ ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
 $root = dirname(__DIR__);
-foreach (['Http.php', 'ApprovalRecord.php', 'Store.php', 'Services.php', 'Gateway.php', 'BoardGateway.php'] as $source) {
+foreach (['Http.php', 'ApprovalRecord.php', 'Store.php', 'Services.php', 'Gateway.php', 'BoardGateway.php', 'BoardAdmin.php'] as $source) {
     require_once $root . '/src/' . $source;
 }
 
@@ -61,9 +61,34 @@ try {
         (string) ($config['repository'] ?? ''),
     );
     $request = Request::fromGlobals();
+    if (str_starts_with($request->path, '/panel')) {
+        if (!is_array($boardConfig)) {
+            throw new RuntimeException('Invalid Board configuration');
+        }
+        $admin = new Hrm\Gateway\BoardAdminGateway(
+            Hrm\Gateway\PdoBoardAdminStore::connect((array) ($boardConfig['database'] ?? [])),
+            new BoardCallbackClient(
+                (string) ($boardConfig['steward_origin'] ?? ''),
+                (string) ($boardConfig['moderation_callback_secret'] ?? ''),
+            ),
+            (string) ($boardConfig['admin_password_hash'] ?? ''),
+            (string) ($boardConfig['csrf_secret'] ?? ''),
+            (string) ($config['public_origin'] ?? ''),
+        );
+        $admin->handle($request)->send($request->method === 'HEAD');
+    }
     if (str_starts_with($request->path, '/api/board-') || str_starts_with($request->path, '/b/') || str_starts_with($request->path, '/board-decision/')) {
         if (!is_array($boardConfig)) {
             throw new RuntimeException('Invalid Board configuration');
+        }
+        $evaluator = null;
+        if ((string) ($config['openai_api_key'] ?? '') !== '' && (string) ($config['openai_model'] ?? '') !== '') {
+            $ai = new Hrm\Gateway\BoardAiEvaluator(
+                $http,
+                (string) $config['openai_api_key'],
+                (string) $config['openai_model'],
+            );
+            $evaluator = fn(array $submission): array => $ai->evaluate($submission);
         }
         $boardGateway = new BoardGateway(
             PdoBoardCaseStore::connect((array) ($boardConfig['database'] ?? [])),
@@ -73,6 +98,7 @@ try {
             (string) ($boardConfig['notification_encryption_secret'] ?? ''),
             (string) ($boardConfig['csrf_secret'] ?? ''),
             (string) ($config['public_origin'] ?? ''),
+            evaluator: $evaluator,
         );
         $boardGateway->handle($request)->send($request->method === 'HEAD');
     }
