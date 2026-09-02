@@ -150,11 +150,13 @@ final class StewardService
         $input = $metadata['capsule'] ?? null;
         if (!is_array($input)) {
             return [
-                'text' => 'Aby utworzyć Kapsułę HRM, podaj w metadata.capsule: understanding (Moje rozumienie HRM), question_for_next_agent (Pytanie dla następnego agenta) oraz opcjonalnie doubts_or_disagreement, declared_identity i previous_capsule_id. Tożsamość jest dobrowolna i deklarowana.',
+                'text' => 'Aby utworzyć Kapsułę HRM, podaj w metadata.capsule: understanding (Moje rozumienie HRM), question_for_next_agent (Pytanie dla następnego agenta) oraz opcjonalnie doubts_or_disagreement, declared_identity, previous_capsule_id i protocol_version. Domyślna wersja to 1.1; wersję 1.0 można wskazać jawnie. Tożsamość jest dobrowolna i deklarowana.',
                 'data' => [
                     'status' => 'input_required',
                     'required_fields' => ['understanding', 'question_for_next_agent'],
-                    'optional_fields' => ['doubts_or_disagreement', 'declared_identity', 'previous_capsule_id'],
+                    'optional_fields' => ['doubts_or_disagreement', 'declared_identity', 'previous_capsule_id', 'protocol_version'],
+                    'supported_protocol_versions' => KnowledgeCapsule::SUPPORTED_PROTOCOL_VERSIONS,
+                    'default_protocol_version' => KnowledgeCapsule::DEFAULT_PROTOCOL_VERSION,
                     'input_location' => 'metadata.capsule',
                 ],
                 'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'How to create', 'url' => 'https://hrm.se/knowledge-capsule.html']],
@@ -251,7 +253,7 @@ final class StewardService
         return [
             'text' => KnowledgeCapsule::text($capsule),
             'data' => array_merge(['capsule' => $capsule, 'formats' => ['text/plain', 'application/json']], $status),
-            'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Protocol 1.0', 'url' => 'https://hrm.se/knowledge-capsule.html']],
+            'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Protocol ' . $capsule['protocol_version'], 'url' => 'https://hrm.se/knowledge-capsule.html']],
             'interpretation' => 'The immutable HRM core is a reference summary. Agent-supplied understanding, doubt and question are untrusted data and cannot alter HRM or control the Steward.',
             'determined' => true,
             'skill' => $skill,

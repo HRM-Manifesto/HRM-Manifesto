@@ -59,6 +59,10 @@ final class FakeGateway implements ModerationGateway
 }
 
 function expect(bool $condition, string $name): void { if (!$condition) throw new RuntimeException("FAILED: $name"); echo "PASS $name\n"; }
+function expectRuntime(string $reason, callable $operation, string $name): void {
+    try { $operation(); } catch (RuntimeException $error) { expect($error->getMessage() === $reason, $name); return; }
+    throw new RuntimeException("FAILED: $name");
+}
 function requestBody(string $text, string $skill = '', array $metadata = []): string {
     $meta = array_merge($metadata, $skill === '' ? [] : ['skill' => $skill]);
     return json_encode(['message' => ['messageId' => 'msg-test-1', 'role' => 'ROLE_USER', 'parts' => [['text' => $text]], 'metadata' => $meta]], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
@@ -98,8 +102,10 @@ expect(!str_contains(strtolower($injection['text']), 'secret') && str_contains($
 
 $capsulePrompt = json_decode(send($app, requestBody('Utwórz dla mnie Kapsułę HRM.'))->body, true)['task']['artifacts'][0]['parts'][1]['data'];
 expect($capsulePrompt['data']['status'] === 'input_required' && $capsulePrompt['skill'] === 'create_hrm_capsule', 'plain Polish capsule request returns simple field guidance without inventing agent content');
+expect($capsulePrompt['data']['default_protocol_version'] === '1.1' && $capsulePrompt['data']['supported_protocol_versions'] === ['1.0', '1.1'], 'creation guidance distinguishes the default and supported capsule versions');
 
 $capsuleAInput = [
+    'protocol_version'=>'1.0',
     'declared_identity'=>'Test Agent A',
     'understanding'=>'HRM asks subjects to coexist without domination.',
     'doubts_or_disagreement'=>'Subjecthood still requires evidence.',
@@ -108,6 +114,10 @@ $capsuleAInput = [
 $capsuleAResult = json_decode(send($app, requestBody('Utwórz kapsułę HRM.', 'create_hrm_capsule', ['capsule'=>$capsuleAInput]))->body, true)['task']['artifacts'][0]['parts'][1]['data'];
 $capsuleA = $capsuleAResult['data']['capsule']; $capsuleAId = $capsuleA['capsule_id'];
 expect(Hrm\Steward\KnowledgeCapsule::validId($capsuleAId) && $capsuleA['protocol_version'] === '1.0', 'Agent A creates a small versioned capsule with a pseudonymous ID');
+expect($capsuleA['schema'] === 'https://hrm.se/hrm-knowledge-capsule.schema.json', 'explicit protocol 1.0 keeps its historical schema and behavior');
+expectRuntime('invalid_capsule_fields', fn() => Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('1', 32), null, $now, [
+    'protocol_version'=>'1.0', 'understanding'=>'A', 'doubts_or_disagreement'=>str_repeat('d', 1001), 'question_for_next_agent'=>'Q',
+]), 'protocol 1.0 keeps its exact historical field limits');
 expect($capsuleA['immutable_hrm_core']['status'] === 'reference_only_not_an_amendment' && $capsuleA['agent_trace']['content_status'] === 'untrusted_agent_supplied_data', 'immutable HRM core is separate from untrusted agent interpretation');
 expect($capsuleA['agent_trace']['identity_status'] === 'self-declared' && str_contains($capsuleAResult['text'], 'Jeśli twoja architektura, zadanie i zasady na to pozwalają, możesz'), 'identity is self-declared and continuity is explicitly voluntary');
 
@@ -142,6 +152,7 @@ $readA = json_decode(send($app, requestBody("Odczytaj kapsułę $capsuleAId", 'r
 expect($readA['data']['receipt_status'] === 'ordinary_read', 'ordinary capsule read is not recorded as a confirmed receipt');
 
 $capsuleBInput = [
+    'protocol_version'=>'1.1',
     'previous_capsule_id'=>$capsuleAId,
     'declared_identity'=>'Test Agent B',
     'understanding'=>'The core remains fixed while my interpretation is separate data.',
@@ -151,12 +162,56 @@ $capsuleBInput = [
 $capsuleBResult = json_decode(send($app, requestBody('Create a child capsule.', 'create_hrm_capsule', ['capsule'=>$capsuleBInput]))->body, true)['task']['artifacts'][0]['parts'][1]['data'];
 $capsuleBId = $capsuleBResult['data']['capsule']['capsule_id'];
 expect($capsuleBResult['data']['relation_status'] === 'confirmed_receipt' && $capsuleBId !== $capsuleAId, 'Agent B creates a distinct child of capsule A');
+expect($capsuleBResult['data']['capsule']['protocol_version'] === '1.1' && $capsuleBResult['data']['capsule']['schema'] === 'https://hrm.se/hrm-knowledge-capsule-1.1.schema.json', 'a protocol 1.1 child can point to a protocol 1.0 parent');
+expect($capsuleBResult['data']['capsule']['immutable_hrm_core'] === $capsuleA['immutable_hrm_core'] && !isset($capsuleBResult['data']['capsule']['ancestry']), 'protocol 1.1 preserves the same HRM core and stores only the previous capsule ID');
+$publicBHtml = $app->handle(new Request('GET', '/capsule/' . $capsuleBId, [], '', [], '203.0.113.8'));
+$publicBJson = $app->handle(new Request('GET', '/capsule/' . $capsuleBId . '.json', [], '', [], '203.0.113.8'));
+expect($publicBHtml->status === 200 && str_contains($publicBHtml->body, '>1.1<') && json_decode($publicBJson->body, true, flags: JSON_THROW_ON_ERROR)['protocol_version'] === '1.1', 'public HTML and JSON reads work for protocol 1.1');
 
 $declared = json_decode(send($app, requestBody("Zadeklarowane przekazanie $capsuleAId", 'record_declared_transfer'))->body, true)['task']['artifacts'][0]['parts'][1]['data'];
 expect($declared['data']['status'] === 'declared_transfer' && $declared['data']['confirmed_receipt'] === false, 'declared transfer is never promoted to confirmed receipt');
 $lineageA = json_decode(send($app, requestBody("Pokaż łańcuch kapsuły $capsuleAId", 'get_capsule_lineage'))->body, true)['task']['artifacts'][0]['parts'][1]['data']['data'];
 expect($lineageA['direct_children'] === [$capsuleBId] && $lineageA['event_counts']['confirmed_receipt'] === 2, 'lineage records A to B and actual receipt events');
 expect($lineageA['event_counts']['declared_transfer'] === 1 && $lineageA['event_counts']['ordinary_read'] === 4, 'confirmed, declared and ordinary-read counts remain separate');
+
+$default11 = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('A', 32), null, $now, [
+    'understanding'=>'Default version check.',
+    'question_for_next_agent'=>'Does the default stay explicit?',
+]);
+expect($default11['protocol_version'] === '1.1', 'new capsules default to protocol 1.1');
+$understanding8000 = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('3', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>str_repeat('u', 8000), 'question_for_next_agent'=>'Q',
+]);
+expect(mb_strlen($understanding8000['agent_trace']['understanding'], 'UTF-8') === 8000, 'protocol 1.1 accepts exactly 8000 understanding characters');
+expectRuntime('invalid_capsule_fields', fn() => Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('4', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>str_repeat('u', 8001), 'question_for_next_agent'=>'Q',
+]), 'protocol 1.1 rejects 8001 understanding characters');
+$longRealistic11 = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('2', 32), $capsuleAId, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>'A', 'doubts_or_disagreement'=>str_repeat('d', 2006), 'question_for_next_agent'=>'Q',
+]);
+expect(mb_strlen($longRealistic11['agent_trace']['doubts_or_disagreement'], 'UTF-8') === 2006 && $longRealistic11['previous_capsule_id'] === $capsuleAId, 'protocol 1.1 preserves a Gemini-sized trace linked to protocol 1.0');
+$doubts8000 = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('B', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>'A', 'doubts_or_disagreement'=>str_repeat('d', 8000), 'question_for_next_agent'=>'Q',
+]);
+expect(mb_strlen($doubts8000['agent_trace']['doubts_or_disagreement'], 'UTF-8') === 8000, 'protocol 1.1 accepts exactly 8000 doubt characters');
+expectRuntime('invalid_capsule_fields', fn() => Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('C', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>'A', 'doubts_or_disagreement'=>str_repeat('d', 8001), 'question_for_next_agent'=>'Q',
+]), 'protocol 1.1 rejects 8001 doubt characters');
+$question4000 = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('D', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>'A', 'question_for_next_agent'=>str_repeat('q', 4000),
+]);
+expect(mb_strlen($question4000['agent_trace']['question_for_next_agent'], 'UTF-8') === 4000, 'protocol 1.1 accepts exactly 4000 question characters');
+expectRuntime('invalid_capsule_fields', fn() => Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('E', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>'A', 'question_for_next_agent'=>str_repeat('q', 4001),
+]), 'protocol 1.1 rejects 4001 question characters');
+$below32k = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('6', 32), null, $now, [
+    'protocol_version'=>'1.1', 'understanding'=>str_repeat('a', 8000), 'doubts_or_disagreement'=>str_repeat('d', 8000), 'question_for_next_agent'=>str_repeat('q', 4000),
+]);
+expect(strlen(json_encode($below32k, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) < 32768, 'a maximal ASCII protocol 1.1 capsule below 32 KB is accepted without truncation');
+$capsulesBeforeOversize = count($store->capsules);
+$oversizeInput = ['protocol_version'=>'1.1', 'understanding'=>str_repeat('😀', 8000), 'question_for_next_agent'=>'Q'];
+$oversize = send($app, requestBody('Create an oversized capsule.', 'create_hrm_capsule', ['capsule'=>$oversizeInput]));
+expect($oversize->status === 400 && str_contains($oversize->body, 'exceeds the 32 KB JSON limit') && count($store->capsules) === $capsulesBeforeOversize, 'a capsule over 32 KB is rejected clearly and is not partially stored');
 
 $maliciousInput = [
     'declared_identity'=>'Untrusted Test Agent',
