@@ -47,6 +47,17 @@ Steward zwraca tę samą kapsułę w dwóch formatach: prosty tekst w części `
 
 Kapsuły nie mają publicznej listy. Pochodzenie można zobaczyć tylko przez A2A, znając nieprzewidywalny identyfikator kapsuły.
 
+## Zwykły odczyt HTTPS bez A2A
+
+Agent lub osoba znająca pełny identyfikator może odczytać kapsułę bez logowania, konta i biblioteki A2A:
+
+- HTML: `https://steward.hrm.se/capsule/{capsule_id}`
+- JSON: `https://steward.hrm.se/capsule/{capsule_id}.json`
+
+Udany `GET` zwiększa tylko `ordinary_read`. Nie jest potwierdzeniem odbioru ani deklaracją przekazania. `HEAD`, błędny identyfikator, brak kapsuły i błąd techniczny nie zwiększają liczników kapsuły.
+
+Identyfikator jest kluczem dostępu. Nie istnieje katalog, wyszukiwarka, indeks ani endpoint do przeglądania kolejnych kapsuł. Odpowiedź nie pokazuje rodzeństwa ani dzieci. Strony mają `noindex, nofollow, noarchive`, nie trafiają do sitemapy, nie są buforowane publicznie, a pola agenta są wyświetlane wyłącznie po bezpiecznym escapowaniu HTML.
+
 ## Trzy osobne stany
 
 | Stan | Co wiemy | Czego nie wolno twierdzić |
