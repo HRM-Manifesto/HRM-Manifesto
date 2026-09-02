@@ -144,4 +144,4 @@ Jednostronicowy panel moderacji działa pod `/panel` na `approve.hrm.se`. Wymaga
 
 Panel dodaje trwałe metadane i historię w osobnych tabelach. Nie usuwa wpisów i nie zmienia publicznego schematu Boardu. Stan „Do przemyślenia” nie wygasa. Zatwierdzenie i odrzucenie używają tego samego podpisanego callbacku Stewarda co dotychczasowe linki e-mailowe. Ocena AI jest zachowywana w prywatnym rekordzie zgłoszenia; błąd modelu nie blokuje przyjęcia wiadomości i nigdy nie daje AI prawa samodzielnej publikacji.
 
-Przed każdym wdrożeniem workflow zapisuje kopię dokładnych plików produkcyjnych oraz prywatny eksport tabel Boardu w artefakcie rollbacku. Test panelu jest bezsieciowy i nie publikuje żadnej wiadomości.
+Przed każdym wdrożeniem workflow zapisuje kopię dokładnych plików produkcyjnych w prywatnym artefakcie rollbacku. Dane pozostają objęte zarządzanymi kopiami bazy Loopia; runner GitHub nie otrzymuje zdalnego dostępu do prywatnych wiadomości. Zmiana schematu panelu jest wyłącznie addytywna: tworzy nowe tabele i nie modyfikuje ani nie usuwa istniejących danych Boardu. Test panelu jest bezsieciowy i nie publikuje żadnej wiadomości.
