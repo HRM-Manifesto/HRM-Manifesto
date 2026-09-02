@@ -14,7 +14,7 @@ test('Agent Card contains required A2A 1.0 fields and exact public skills', asyn
   assert.equal(card.supportedInterfaces[0].url, 'https://steward.hrm.se');
   assert.equal(card.capabilities.streaming, false);
   assert.equal(card.capabilities.pushNotifications, false);
-  assert.equal(card.version, '1.2.0');
+  assert.equal(card.version, '1.2.1');
   assert.equal(card.skills.length, 12);
   for (const id of ['explain_hrm','find_hrm_source','explain_subjecthood','explain_rights_and_responsibilities','critique_hrm','read_agent_board','submit_message','create_hrm_capsule','read_hrm_capsule','receive_hrm_capsule','record_declared_transfer','get_capsule_lineage']) {
     assert.ok(card.skills.some((skill) => skill.id === id));
@@ -110,7 +110,7 @@ test('public PHP surfaces have request, size, version, media and moderation gate
   for (const marker of ["'/capsule/'", "'capsule_read'", 'noindex, nofollow, noarchive', 'capsuleNotFound', 'html((string) $trace']) {
     assert.ok(application.includes(marker), marker);
   }
-  for (const marker of ["'/capsule/create'", "'capsule_continue'", "'capsule_write'", 'ContinuationToken::issue', 'createDirectCapsule', 'direct_child_submission']) {
+  for (const marker of ["'/capsule/create'", "'capsule_continue'", "'capsule_write_attempt'", "'capsule_write_success'", 'ContinuationToken::issue', 'createDirectCapsule', 'direct_child_submission', 'request_template', 'Retry-After']) {
     assert.ok(application.includes(marker) || (await read('agent-steward/php/src/Store.php')).includes(marker), marker);
   }
   const gateway = await read('forum-steward/approval-gateway/php/src/BoardGateway.php');

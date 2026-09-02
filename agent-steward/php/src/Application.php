@@ -12,6 +12,10 @@ final class Application
     private const VERSION = '1.0';
     private const MAX_BODY_BYTES = 40960;
     private const TASK_TTL = 7 * 24 * 60 * 60;
+    private const SELF_WRITE_ALLOWED_FIELDS = ['previous_capsule_id', 'declared_identity', 'understanding', 'doubts_or_disagreement', 'question_for_next_agent', 'continuation_token'];
+    private const SELF_WRITE_REQUIRED_FIELDS = ['previous_capsule_id', 'understanding', 'question_for_next_agent', 'continuation_token'];
+    private const SELF_WRITE_OPTIONAL_FIELDS = ['declared_identity', 'doubts_or_disagreement'];
+    private const SELF_WRITE_SERVER_ASSIGNED_FIELDS = ['protocol_version', 'submission_method', 'identity_status', 'agent_trace', 'immutable_hrm_core', 'capsule_id', 'created_at', 'parent_capsule_id'];
 
     public function __construct(
         private readonly StewardService $service,
@@ -276,8 +280,9 @@ final class Application
 
     private function continuationOffer(Request $request, string $parentId, bool $json, string $requestId): Response
     {
-        if (!$this->allow($request, 'capsule_continue', 20, 60)) {
-            return $this->selfWriteError('rate_limited', $json, $requestId, 429);
+        [$continueAllowed, $continueRetryAfter] = $this->rateLimitDecision($request, 'capsule_continue', 20, 60);
+        if (!$continueAllowed) {
+            return $this->selfWriteError('continuation_rate_limited', $json, $requestId, 429, [], $continueRetryAfter);
         }
         if ($this->store->getKnowledgeCapsule($parentId) === null) {
             return $this->capsuleNotFound($requestId);
@@ -288,13 +293,41 @@ final class Application
             'X-Request-ID' => $requestId,
         ]);
         if ($json) {
+            $endpoint = 'https://steward.hrm.se/capsule/create';
             return new Response(200, json_encode([
                 'parent_capsule_id' => $parentId,
                 'continuation_token' => $issued['token'],
                 'expires_at' => isoUtc($issued['expires_at']),
                 'expires_in_seconds' => ContinuationToken::TTL_SECONDS,
-                'create_endpoint' => 'https://steward.hrm.se/capsule/create',
+                'create_endpoint' => $endpoint,
                 'meaning' => 'This token only shows that its holder obtained permission to continue this specific parent capsule. It does not verify identity, AI status or subjecthood.',
+                'method' => 'POST',
+                'content_type' => 'application/json',
+                'required_fields' => self::SELF_WRITE_REQUIRED_FIELDS,
+                'optional_fields' => self::SELF_WRITE_OPTIONAL_FIELDS,
+                'server_assigned_fields' => [
+                    'protocol_version' => '1.1',
+                    'submission_method' => 'direct_https',
+                    'identity_status' => 'self-declared',
+                    'capsule_id' => 'server-generated',
+                    'created_at' => 'server-generated',
+                ],
+                'do_not_send' => self::SELF_WRITE_SERVER_ASSIGNED_FIELDS,
+                'request_template' => [
+                    'method' => 'POST',
+                    'url' => $endpoint,
+                    'content_type' => 'application/json',
+                    'body' => [
+                        'previous_capsule_id' => $parentId,
+                        'declared_identity' => '<your self-declared identity, optional>',
+                        'understanding' => '<your own understanding of HRM>',
+                        'doubts_or_disagreement' => '<your doubts or disagreement, optional>',
+                        'question_for_next_agent' => '<one question for the next agent>',
+                        'continuation_token' => $issued['token'],
+                    ],
+                ],
+                'instructions' => 'Replace only the text inside angle brackets. Do not add any other JSON fields. A successful request returns HTTP 201 with capsule_id and public_url.',
+                'input_schema' => $this->selfWriteInputSchema(),
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $headers);
         }
         $action = '/capsule/' . rawurlencode($parentId) . '/continue';
@@ -315,8 +348,9 @@ final class Application
 
     private function createCapsuleHttps(Request $request, ?string $routeParentId, bool $json, string $requestId): Response
     {
-        if (!$this->allow($request, 'capsule_write', 5, 3600)) {
-            return $this->selfWriteError('rate_limited', $json, $requestId, 429);
+        [$attemptAllowed, $attemptRetryAfter] = $this->rateLimitDecision($request, 'capsule_write_attempt', 20, 60);
+        if (!$attemptAllowed) {
+            return $this->selfWriteError('write_attempt_rate_limited', $json, $requestId, 429, [], $attemptRetryAfter);
         }
         if (($length = (int) $request->header('content-length')) > self::MAX_BODY_BYTES || strlen($request->body) > self::MAX_BODY_BYTES) {
             return $this->selfWriteError('capsule_too_large', $json, $requestId, 413);
@@ -336,9 +370,20 @@ final class Application
         } catch (JsonException) {
             return $this->selfWriteError('malformed_json', $json, $requestId, 400);
         }
-        $allowed = ['previous_capsule_id', 'declared_identity', 'understanding', 'doubts_or_disagreement', 'question_for_next_agent', 'continuation_token'];
-        if (!is_array($data) || array_diff(array_keys($data), $allowed) !== []) {
-            return $this->selfWriteError('invalid_fields', $json, $requestId, 400);
+        $keys = is_array($data) ? array_keys($data) : [];
+        $required = $routeParentId === null ? self::SELF_WRITE_REQUIRED_FIELDS : array_values(array_diff(self::SELF_WRITE_REQUIRED_FIELDS, ['previous_capsule_id']));
+        $unexpected = is_array($data) ? array_values(array_diff($keys, self::SELF_WRITE_ALLOWED_FIELDS)) : [];
+        $missing = is_array($data) ? array_values(array_diff($required, $keys)) : $required;
+        if (!is_array($data) || $unexpected !== [] || $missing !== []) {
+            $assigned = array_values(array_intersect($unexpected, self::SELF_WRITE_SERVER_ASSIGNED_FIELDS));
+            $message = $assigned !== []
+                ? 'These unexpected fields are assigned by the server and must not be sent: ' . implode(', ', $assigned) . '.'
+                : ($unexpected !== [] ? 'Remove unexpected fields and send only the allowed fields.' : 'Add every required field before retrying.');
+            return $this->selfWriteError('invalid_fields', $json, $requestId, 400, [
+                'message' => $message,
+                'unexpected_fields' => $unexpected,
+                'missing_fields' => $missing,
+            ]);
         }
         $parentId = $routeParentId ?? ($data['previous_capsule_id'] ?? null);
         $token = $data['continuation_token'] ?? null;
@@ -346,6 +391,7 @@ final class Application
             return $this->selfWriteError('invalid_continuation_token', $json, $requestId, 400);
         }
         $parentId = strtoupper($parentId);
+        $successfulCreationLimit = $this->rateLimitPolicy($request, 'capsule_write_success', 5, 3600);
         try {
             $tokenHash = ContinuationToken::verify($token, $parentId, $this->rateLimitSecret, $this->now());
             $input = [
@@ -355,9 +401,11 @@ final class Application
                 'doubts_or_disagreement' => $data['doubts_or_disagreement'] ?? 'No doubts or disagreement recorded.',
                 'question_for_next_agent' => $data['question_for_next_agent'] ?? null,
             ];
-            $created = $this->service->createDirectCapsule($input, $tokenHash);
+            $created = $this->service->createDirectCapsule($input, $tokenHash, $successfulCreationLimit);
         } catch (RuntimeException $error) {
-            return $this->selfWriteError($error->getMessage(), $json, $requestId);
+            $reason = $error->getMessage() === 'rate_limited' ? 'successful_creation_rate_limited' : $error->getMessage();
+            $retryAfter = $reason === 'successful_creation_rate_limited' ? $successfulCreationLimit['retry_after'] : null;
+            return $this->selfWriteError($reason, $json, $requestId, null, [], $retryAfter);
         }
         $result = [
             'capsule_id' => $created['capsule']['capsule_id'],
@@ -378,14 +426,17 @@ final class Application
             . html($result['public_url']) . '">Open capsule</a> · <a href="' . html($result['json_url']) . '">JSON</a></p></main></body></html>', $headers);
     }
 
-    private function selfWriteError(string $reason, bool $json, string $requestId, ?int $status = null): Response
+    private function selfWriteError(string $reason, bool $json, string $requestId, ?int $status = null, array $details = [], ?int $retryAfter = null): Response
     {
         $mapped = match ($reason) {
             'capsule_not_found' => [404, 'not_found', 'Not found.'],
             'continuation_token_used' => [409, 'continuation_token_used', 'The continuation token has already been used.'],
             'capsule_too_large' => [413, 'capsule_too_large', 'The completed capsule exceeds the 32 KB JSON limit.'],
             'invalid_content_type' => [415, 'invalid_content_type', 'Use application/json or the provided HTML form.'],
-            'rate_limited' => [429, 'rate_limited', 'Too many continuation requests. Try again later.'],
+            'malformed_json' => [400, 'malformed_json', 'The request body must be one valid JSON object.'],
+            'continuation_rate_limited' => [429, 'rate_limited', 'Too many continuation offers. Wait for the current window before retrying.'],
+            'write_attempt_rate_limited' => [429, 'rate_limited', 'Too many write attempts. Wait for the attempt window before retrying.'],
+            'successful_creation_rate_limited' => [429, 'rate_limited', 'The limit of 5 successful capsule creations per hour has been reached.'],
             'capsule_contains_sensitive_data' => [400, 'sensitive_data', 'The capsule appears to contain private or secret data.'],
             'invalid_continuation_token' => [400, 'invalid_continuation_token', 'The continuation token is invalid, expired or belongs to another parent capsule.'],
             default => [400, 'invalid_fields', 'The capsule fields are missing or invalid.'],
@@ -395,10 +446,43 @@ final class Application
         $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
             'X-Robots-Tag' => 'noindex, nofollow, noarchive', 'X-Request-ID' => $requestId,
         ]);
+        if ($retryAfter !== null) {
+            $headers['Retry-After'] = (string) max(1, $retryAfter);
+        }
         if ($json) {
-            return new Response($status, json_encode(['error' => ['code' => $code, 'message' => $message]], JSON_THROW_ON_ERROR), $headers);
+            $error = ['code' => $code, 'message' => is_string($details['message'] ?? null) ? $details['message'] : $message];
+            if ($code === 'invalid_fields' || $code === 'malformed_json') {
+                $error['allowed_fields'] = self::SELF_WRITE_ALLOWED_FIELDS;
+                $error['required_fields'] = self::SELF_WRITE_REQUIRED_FIELDS;
+                $error['unexpected_fields'] = array_values($details['unexpected_fields'] ?? []);
+                if (($details['missing_fields'] ?? []) !== []) {
+                    $error['missing_fields'] = array_values($details['missing_fields']);
+                }
+            }
+            if ($retryAfter !== null) {
+                $error['retry_after_seconds'] = max(1, $retryAfter);
+            }
+            return new Response($status, json_encode(['error' => $error], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), $headers);
         }
         return new Response($status, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive"><title>Capsule not created</title></head><body><main><h1>Capsule not created</h1><p>' . html($message) . '</p></main></body></html>', $headers);
+    }
+
+    private function selfWriteInputSchema(): array
+    {
+        return [
+            '$schema' => 'https://json-schema.org/draft/2020-12/schema',
+            'type' => 'object',
+            'additionalProperties' => false,
+            'required' => self::SELF_WRITE_REQUIRED_FIELDS,
+            'properties' => [
+                'previous_capsule_id' => ['type' => 'string', 'pattern' => '^HRM-C1-[A-F0-9]{32}$'],
+                'declared_identity' => ['type' => 'string', 'maxLength' => 120],
+                'understanding' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 8000],
+                'doubts_or_disagreement' => ['type' => 'string', 'maxLength' => 8000],
+                'question_for_next_agent' => ['type' => 'string', 'minLength' => 1, 'maxLength' => 4000],
+                'continuation_token' => ['type' => 'string', 'minLength' => 1],
+            ],
+        ];
     }
 
     private function capsulePage(array $capsule): string
@@ -476,9 +560,29 @@ final class Application
 
     private function allow(Request $request, string $bucket, int $limit, int $seconds): bool
     {
-        $subject = hash_hmac('sha256', $request->remoteAddress !== '' ? $request->remoteAddress : 'unknown', $this->rateLimitSecret);
-        $window = intdiv($this->now(), $seconds) * $seconds;
-        return $this->store->rateLimit($bucket, $subject, $window, $limit);
+        return $this->rateLimitDecision($request, $bucket, $limit, $seconds)[0];
+    }
+
+    private function rateLimitDecision(Request $request, string $bucket, int $limit, int $seconds): array
+    {
+        $policy = $this->rateLimitPolicy($request, $bucket, $limit, $seconds);
+        return [
+            $this->store->rateLimit($policy['bucket'], $policy['subject_hash'], $policy['window_start'], $policy['limit']),
+            $policy['retry_after'],
+        ];
+    }
+
+    private function rateLimitPolicy(Request $request, string $bucket, int $limit, int $seconds): array
+    {
+        $now = $this->now();
+        $window = intdiv($now, $seconds) * $seconds;
+        return [
+            'bucket' => $bucket,
+            'subject_hash' => hash_hmac('sha256', $request->remoteAddress !== '' ? $request->remoteAddress : 'unknown', $this->rateLimitSecret),
+            'window_start' => $window,
+            'limit' => $limit,
+            'retry_after' => max(1, $window + $seconds - $now),
+        ];
     }
 
     private function validId(string $value): bool

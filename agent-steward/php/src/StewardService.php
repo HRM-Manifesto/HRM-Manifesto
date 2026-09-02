@@ -37,10 +37,10 @@ final class StewardService
         };
     }
 
-    public function createDirectCapsule(array $input, string $continuationTokenHash): array
+    public function createDirectCapsule(array $input, string $continuationTokenHash, array $successRateLimit): array
     {
         $input['protocol_version'] = '1.1';
-        $capsule = $this->buildAndStoreCapsule($input, 'direct_https', $continuationTokenHash);
+        $capsule = $this->buildAndStoreCapsule($input, 'direct_https', $continuationTokenHash, $successRateLimit);
         return [
             'capsule' => $capsule,
             'submission_method' => 'direct_https',
@@ -196,7 +196,7 @@ final class StewardService
         ]);
     }
 
-    private function buildAndStoreCapsule(array $input, string $submissionMethod, ?string $continuationTokenHash = null): array
+    private function buildAndStoreCapsule(array $input, string $submissionMethod, ?string $continuationTokenHash = null, ?array $successRateLimit = null): array
     {
         $previousId = $input['previous_capsule_id'] ?? null;
         if ($previousId !== null && (!is_string($previousId) || !KnowledgeCapsule::validId(strtoupper($previousId)))) {
@@ -205,7 +205,7 @@ final class StewardService
         $previousId = is_string($previousId) ? strtoupper($previousId) : null;
         $now = $this->now();
         $capsule = KnowledgeCapsule::build(KnowledgeCapsule::id($this->randomBytes), $previousId, $now, $input);
-        $this->store->createKnowledgeCapsule($capsule, $now, $submissionMethod, $continuationTokenHash);
+        $this->store->createKnowledgeCapsule($capsule, $now, $submissionMethod, $continuationTokenHash, $successRateLimit);
         return $capsule;
     }
 
