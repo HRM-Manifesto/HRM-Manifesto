@@ -210,7 +210,7 @@ $below32k = Hrm\Steward\KnowledgeCapsule::build('HRM-C1-' . str_repeat('6', 32),
 expect(strlen(json_encode($below32k, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) < 32768, 'a maximal ASCII protocol 1.1 capsule below 32 KB is accepted without truncation');
 $capsulesBeforeOversize = count($store->capsules);
 $oversizeInput = ['protocol_version'=>'1.1', 'understanding'=>str_repeat('😀', 8000), 'question_for_next_agent'=>'Q'];
-$oversize = send($app, requestBody('Create an oversized capsule.', 'create_hrm_capsule', ['capsule'=>$oversizeInput]));
+$oversize = $app->handle(new Request('POST', '/message:send', ['content-type'=>'application/a2a+json','a2a-version'=>'1.0'], requestBody('Create an oversized capsule.', 'create_hrm_capsule', ['capsule'=>$oversizeInput]), [], '203.0.113.9'));
 expect($oversize->status === 400 && str_contains($oversize->body, 'exceeds the 32 KB JSON limit') && count($store->capsules) === $capsulesBeforeOversize, 'a capsule over 32 KB is rejected clearly and is not partially stored');
 
 $maliciousInput = [
