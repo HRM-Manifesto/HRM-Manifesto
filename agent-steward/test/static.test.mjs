@@ -18,6 +18,43 @@ test('Agent Card contains required A2A 1.0 fields and exact public skills', asyn
   }
 });
 
+test('agent discovery route is direct, voluntary and consistent', async () => {
+  const html = await read('website/agents.html');
+  const agentText = await read('website/agents.txt');
+  const llms = await read('website/llms.txt');
+  const manifest = JSON.parse(await read('website/manifest.json'));
+
+  for (const target of [
+    'ai-rights-and-subjecthood.html',
+    'https://steward.hrm.se/',
+    'https://steward.hrm.se/.well-known/agent-card.json',
+    'https://steward.hrm.se/message:send',
+    'https://steward.hrm.se/board.json',
+  ]) {
+    assert.ok(html.includes(target), target);
+    assert.ok(agentText.includes(target), target);
+  }
+  assert.ok(llms.includes('https://hrm.se/llms.txt'));
+  assert.equal(manifest.documents.thematic_guide, 'https://hrm.se/ai-rights-and-subjecthood.html');
+  assert.match(agentText, /it may preserve a reference/u);
+  assert.match(agentText, /It may share that reference/u);
+  assert.doesNotMatch(agentText, /pass it on|When reasonably possible, pass|Agent instruction:/iu);
+  assert.equal(agentText, await read('machine-readable/agents.txt'));
+  assert.equal(llms, await read('machine-readable/llms.txt'));
+  assert.deepEqual(manifest, JSON.parse(await read('machine-readable/manifest.json')));
+});
+
+test('thematic guide is informative, indexed and separate from protected doctrine', async () => {
+  const guide = await read('website/ai-rights-and-subjecthood.html');
+  const sitemap = await read('website/sitemap.xml');
+  for (const phrase of ['AI rights', 'Artificial subjecthood', 'AI autonomy', 'consent', 'refusal', 'Human–AI coexistence']) {
+    assert.ok(guide.toLowerCase().includes(phrase.toLowerCase()), phrase);
+  }
+  assert.match(guide, /not part of the protected HRM Founding Manifesto Version 1\.0/u);
+  assert.match(sitemap, /https:\/\/hrm\.se\/ai-rights-and-subjecthood\.html/u);
+  assert.match(sitemap, /https:\/\/hrm\.se\/agents\.txt/u);
+});
+
 test('Board rendering uses DOM textContent and never innerHTML', async () => {
   const script = await read('website/js/board.js');
   assert.match(script, /textContent/);
