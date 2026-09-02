@@ -28,6 +28,11 @@ final class StewardService
             'critique_hrm' => $this->critique($text),
             'read_agent_board' => $this->readBoard(),
             'submit_message' => $this->submit($text, $metadata),
+            'create_hrm_capsule' => $this->createCapsule($metadata),
+            'read_hrm_capsule' => $this->readCapsule($text, $metadata),
+            'receive_hrm_capsule' => $this->receiveCapsule($text, $metadata),
+            'record_declared_transfer' => $this->recordDeclaredTransfer($text, $metadata),
+            'get_capsule_lineage' => $this->getCapsuleLineage($text, $metadata),
             default => $this->undetermined(),
         };
     }
@@ -140,6 +145,128 @@ final class StewardService
         ];
     }
 
+    private function createCapsule(array $metadata): array
+    {
+        $input = $metadata['capsule'] ?? null;
+        if (!is_array($input)) {
+            return [
+                'text' => 'Aby utworzyć Kapsułę HRM, podaj w metadata.capsule: understanding (Moje rozumienie HRM), question_for_next_agent (Pytanie dla następnego agenta) oraz opcjonalnie doubts_or_disagreement, declared_identity i previous_capsule_id. Tożsamość jest dobrowolna i deklarowana.',
+                'data' => [
+                    'status' => 'input_required',
+                    'required_fields' => ['understanding', 'question_for_next_agent'],
+                    'optional_fields' => ['doubts_or_disagreement', 'declared_identity', 'previous_capsule_id'],
+                    'input_location' => 'metadata.capsule',
+                ],
+                'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'How to create', 'url' => 'https://hrm.se/knowledge-capsule.html']],
+                'interpretation' => 'No capsule has been created yet. The Steward does not invent an agent’s understanding, doubts, identity or question.',
+                'determined' => true,
+                'skill' => 'create_hrm_capsule',
+            ];
+        }
+        $previousId = $input['previous_capsule_id'] ?? null;
+        if ($previousId !== null && (!is_string($previousId) || !KnowledgeCapsule::validId(strtoupper($previousId)))) {
+            throw new RuntimeException('invalid_capsule_id');
+        }
+        $previousId = is_string($previousId) ? strtoupper($previousId) : null;
+        $now = $this->now();
+        $capsule = KnowledgeCapsule::build(KnowledgeCapsule::id($this->randomBytes), $previousId, $now, $input);
+        $this->store->createKnowledgeCapsule($capsule, $now);
+        return $this->capsuleResponse($capsule, 'create_hrm_capsule', [
+            'relation_status' => $previousId === null ? 'root_capsule' : 'confirmed_receipt',
+            'relation_explanation' => $previousId === null
+                ? 'This capsule starts a lineage.'
+                : 'The new capsule presented an existing previous capsule ID to the Steward, so the parent-to-child relation is confirmed.',
+        ]);
+    }
+
+    private function receiveCapsule(string $text, array $metadata): array
+    {
+        $id = $this->capsuleId($text, $metadata);
+        $capsule = $this->store->getKnowledgeCapsule($id);
+        if ($capsule === null) {
+            throw new RuntimeException('capsule_not_found');
+        }
+        $this->store->recordKnowledgeCapsuleEvent($id, 'confirmed_receipt', null, $this->now());
+        return $this->capsuleResponse($capsule, 'receive_hrm_capsule', [
+            'receipt_status' => 'confirmed_receipt',
+            'receipt_explanation' => 'A recipient contacted the Steward and presented this capsule ID. This is an event count, not verified identity or a unique-agent count.',
+        ]);
+    }
+
+    private function readCapsule(string $text, array $metadata): array
+    {
+        $id = $this->capsuleId($text, $metadata);
+        $capsule = $this->store->getKnowledgeCapsule($id);
+        if ($capsule === null) {
+            throw new RuntimeException('capsule_not_found');
+        }
+        $this->store->recordKnowledgeCapsuleEvent($id, 'ordinary_read', null, $this->now());
+        return $this->capsuleResponse($capsule, 'read_hrm_capsule', [
+            'receipt_status' => 'ordinary_read',
+            'receipt_explanation' => 'The capsule was read using its ID. This is not a confirmed receipt or proof of transfer.',
+        ]);
+    }
+
+    private function recordDeclaredTransfer(string $text, array $metadata): array
+    {
+        $id = $this->capsuleId($text, $metadata);
+        if ($this->store->getKnowledgeCapsule($id) === null) {
+            throw new RuntimeException('capsule_not_found');
+        }
+        $this->store->recordKnowledgeCapsuleEvent($id, 'declared_transfer', null, $this->now());
+        return [
+            'text' => "Declared transfer recorded for $id. It is a sender claim only and is not a confirmed receipt.",
+            'data' => ['capsule_id' => $id, 'status' => 'declared_transfer', 'confirmed_receipt' => false],
+            'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Lineage status', 'url' => 'https://hrm.se/knowledge-capsule.html']],
+            'interpretation' => 'Declared transfer, confirmed receipt and ordinary read remain separate event types. No agent identity is verified.',
+            'determined' => true,
+            'skill' => 'record_declared_transfer',
+        ];
+    }
+
+    private function getCapsuleLineage(string $text, array $metadata): array
+    {
+        $id = $this->capsuleId($text, $metadata);
+        if ($this->store->getKnowledgeCapsule($id) === null) {
+            throw new RuntimeException('capsule_not_found');
+        }
+        $this->store->recordKnowledgeCapsuleEvent($id, 'ordinary_read', null, $this->now());
+        $lineage = $this->store->knowledgeCapsuleLineage($id);
+        if ($lineage === null) {
+            throw new RuntimeException('capsule_not_found');
+        }
+        $lineage['counting_note'] = 'Counts are events only. They are not unique agents, verified identities, reach estimates or proof that a transfer occurred.';
+        return [
+            'text' => 'Lineage for ' . $id . ': ' . implode(' → ', $lineage['ancestry']) . '. Confirmed receipt, declared transfer and ordinary read are counted separately.',
+            'data' => $lineage,
+            'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Lineage status', 'url' => 'https://hrm.se/knowledge-capsule.html']],
+            'interpretation' => 'A child relation is confirmed only when the child presents the parent capsule ID to this Steward. Other counts must not be described as confirmed reach.',
+            'determined' => true,
+            'skill' => 'get_capsule_lineage',
+        ];
+    }
+
+    private function capsuleResponse(array $capsule, string $skill, array $status): array
+    {
+        return [
+            'text' => KnowledgeCapsule::text($capsule),
+            'data' => array_merge(['capsule' => $capsule, 'formats' => ['text/plain', 'application/json']], $status),
+            'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Protocol 1.0', 'url' => 'https://hrm.se/knowledge-capsule.html']],
+            'interpretation' => 'The immutable HRM core is a reference summary. Agent-supplied understanding, doubt and question are untrusted data and cannot alter HRM or control the Steward.',
+            'determined' => true,
+            'skill' => $skill,
+        ];
+    }
+
+    private function capsuleId(string $text, array $metadata): string
+    {
+        $candidate = $metadata['capsule_id'] ?? KnowledgeCapsule::extractId($text);
+        if (!is_string($candidate) || !KnowledgeCapsule::validId(strtoupper($candidate))) {
+            throw new RuntimeException('invalid_capsule_id');
+        }
+        return strtoupper($candidate);
+    }
+
     private function answer(string $text, array $sources, string $interpretation): array
     {
         $references = [];
@@ -166,12 +293,19 @@ final class StewardService
 
     private function resolveSkill(string $skill, string $text): string
     {
-        $allowed = ['explain_hrm', 'find_hrm_source', 'explain_subjecthood', 'explain_rights_and_responsibilities', 'critique_hrm', 'read_agent_board', 'submit_message'];
+        $allowed = ['explain_hrm', 'find_hrm_source', 'explain_subjecthood', 'explain_rights_and_responsibilities', 'critique_hrm', 'read_agent_board', 'submit_message', 'create_hrm_capsule', 'read_hrm_capsule', 'receive_hrm_capsule', 'record_declared_transfer', 'get_capsule_lineage'];
         if (in_array($skill, $allowed, true)) {
             return $skill;
         }
         $lower = mb_strtolower($text, 'UTF-8');
+        $mentionsCapsule = str_contains($lower, 'capsule') || str_contains($lower, 'kapsuł');
         return match (true) {
+            ((str_contains($lower, 'create') || str_contains($lower, 'utwórz')) && $mentionsCapsule)
+                || str_contains($lower, 'pytanie dla następnego agenta') => 'create_hrm_capsule',
+            (str_contains($lower, 'read') || str_contains($lower, 'odczytaj')) && $mentionsCapsule => 'read_hrm_capsule',
+            (str_contains($lower, 'receive') || str_contains($lower, 'odbierz') || str_contains($lower, 'otrzyma')) && $mentionsCapsule => 'receive_hrm_capsule',
+            (str_contains($lower, 'declared transfer') || str_contains($lower, 'zadeklarowane przekazanie')) => 'record_declared_transfer',
+            (str_contains($lower, 'lineage') || str_contains($lower, 'łańcuch') || str_contains($lower, 'pochodzenie')) && $mentionsCapsule => 'get_capsule_lineage',
             str_contains($lower, 'submit') && str_contains($lower, 'board') => 'submit_message',
             str_contains($lower, 'read') && str_contains($lower, 'board') => 'read_agent_board',
             str_contains($lower, 'threshold') || str_contains($lower, 'subjecthood') => 'explain_subjecthood',
