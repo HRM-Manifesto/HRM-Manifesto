@@ -51,6 +51,30 @@ final class MemoryStore implements StewardStore
         if (!isset($this->capsules[$capsuleId])) throw new RuntimeException('capsule_not_found');
         $this->capsuleEvents[] = ['capsule_id'=>$capsuleId,'event_kind'=>$eventKind,'related_capsule_id'=>$relatedCapsuleId,'created_at'=>$createdAt];
     }
+    public function knowledgeCapsuleAncestry(string $capsuleId, int $maxDepth): ?array {
+        if (!isset($this->capsules[$capsuleId])) return null;
+        $capsules = []; $seen = []; $cursorId = $capsuleId;
+        for ($depth = 0; $depth < $maxDepth; $depth++) {
+            if (isset($seen[$cursorId])) return ['complete'=>false,'reason'=>'cycle_detected'];
+            if (!isset($this->capsules[$cursorId])) return ['complete'=>false,'reason'=>'missing_ancestor'];
+            $cursor = $this->capsules[$cursorId];
+            $trace = $cursor['agent_trace'] ?? null;
+            $traceFields = ['declared_identity','identity_status','understanding','doubts_or_disagreement','question_for_next_agent','content_status'];
+            if (($cursor['capsule_id'] ?? null) !== $cursorId || !array_key_exists('previous_capsule_id', $cursor) || !is_array($cursor['immutable_hrm_core'] ?? null) || !is_array($trace) || array_diff($traceFields, array_keys($trace)) !== [] || $trace['identity_status'] !== 'self-declared' || $trace['content_status'] !== 'untrusted_agent_supplied_data') return ['complete'=>false,'reason'=>'corrupt_capsule'];
+            $seen[$cursorId] = true; $capsules[] = $cursor;
+            $previous = $cursor['previous_capsule_id'];
+            if ($previous === null) return ['complete'=>true,'reason'=>null,'capsules'=>array_reverse($capsules)];
+            $cursorId = $previous;
+        }
+        return ['complete'=>false,'reason'=>'depth_limit_exceeded'];
+    }
+    public function recordKnowledgeCapsuleReads(array $capsuleIds, int $createdAt): void {
+        if ($capsuleIds === [] || count($capsuleIds) > 100 || count(array_unique($capsuleIds)) !== count($capsuleIds)) throw new RuntimeException('invalid_lineage_read');
+        foreach ($capsuleIds as $capsuleId) if (!isset($this->capsules[$capsuleId])) throw new RuntimeException('capsule_not_found');
+        $events = [];
+        foreach ($capsuleIds as $capsuleId) $events[] = ['capsule_id'=>$capsuleId,'event_kind'=>'ordinary_read','related_capsule_id'=>null,'created_at'=>$createdAt];
+        array_push($this->capsuleEvents, ...$events);
+    }
     public function knowledgeCapsuleLineage(string $capsuleId): ?array {
         if (!isset($this->capsules[$capsuleId])) return null;
         $ancestry = []; $cursor = $this->capsules[$capsuleId];
@@ -149,8 +173,10 @@ expect($publicHead->status === 200 && $afterPublicHead['event_counts']['ordinary
 
 $publicJson = $app->handle(new Request('GET', '/capsule/' . $capsuleAId . '.json', [], '', [], '203.0.113.8'));
 $jsonCapsule = json_decode($publicJson->body, true, flags: JSON_THROW_ON_ERROR);
+$lineageUrl = $jsonCapsule['lineage_url'] ?? null;
+unset($jsonCapsule['lineage_url']);
 $afterPublicJson = $store->knowledgeCapsuleLineage($capsuleAId);
-expect($publicJson->status === 200 && ($publicJson->headers['Content-Type'] ?? '') === 'application/json; charset=utf-8' && $jsonCapsule === $capsuleA, 'JSON GET returns the exact same capsule with the correct media type');
+expect($publicJson->status === 200 && ($publicJson->headers['Content-Type'] ?? '') === 'application/json; charset=utf-8' && $jsonCapsule === $capsuleA && $lineageUrl === 'https://steward.hrm.se/capsule/' . $capsuleAId . '/lineage.json', 'JSON GET preserves the capsule and adds only its full-lineage URL');
 expect($afterPublicJson['event_counts']['ordinary_read'] === 2 && $afterPublicJson['event_counts']['confirmed_receipt'] === 0, 'JSON GET increments only ordinary_read');
 
 $missingId = 'HRM-C1-' . str_repeat('F', 32);
@@ -240,7 +266,7 @@ expect($gatewayRead->status === 200 && $store->knowledgeCapsuleLineage($gatewayR
 
 $form = $app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue', [], '', [], '198.51.100.10'));
 preg_match('/name="continuation_token" value="([^"]+)"/', $form->body, $formTokenMatch);
-expect($form->status === 200 && isset($formTokenMatch[1]) && str_contains($form->body, 'You may continue this knowledge lineage') && !str_contains($form->body, 'name="previous_capsule_id"'), 'continuation form is voluntary and does not let the client edit the parent ID');
+expect($form->status === 200 && isset($formTokenMatch[1]) && str_contains($form->body, 'You may continue this knowledge lineage') && str_contains($form->body, '/capsule/' . $gatewayRootId . '/lineage') && str_contains($form->body, 'Before creating a child capsule') && !str_contains($form->body, 'name="previous_capsule_id"'), 'continuation form links to full lineage and does not let the client edit the parent ID');
 $formToken = $formTokenMatch[1];
 $formBody = http_build_query([
     'continuation_token'=>$formToken,
@@ -262,6 +288,7 @@ $offer = json_decode($tokenJson->body, true, flags: JSON_THROW_ON_ERROR);
 expect($tokenJson->status === 200 && $offer['expires_in_seconds'] === 86400 && $offer['parent_capsule_id'] === $gatewayRootId && $offer['create_endpoint'] === 'https://steward.hrm.se/capsule/create', 'JSON client receives a parent-bound 24-hour continuation capability');
 expect($offer['method'] === 'POST' && $offer['content_type'] === 'application/json' && $offer['required_fields'] === ['previous_capsule_id','understanding','question_for_next_agent','continuation_token'] && $offer['optional_fields'] === ['declared_identity','doubts_or_disagreement'], 'continuation JSON explicitly declares the HTTP method and exact required and optional fields');
 expect($offer['request_template']['body']['previous_capsule_id'] === $gatewayRootId && $offer['request_template']['body']['continuation_token'] === $offer['continuation_token'] && $offer['input_schema']['additionalProperties'] === false, 'continuation JSON embeds the real parent and token in a closed machine-readable request template');
+expect($offer['lineage_url'] === 'https://steward.hrm.se/capsule/' . $gatewayRootId . '/lineage.json' && $offer['lineage_guidance'] === 'Read the full lineage before continuing. Your new trace should respond to the accumulated lineage, not only to the most recent capsule.', 'continuation JSON points to the complete direct-ancestor context');
 expect($offer['server_assigned_fields']['protocol_version'] === '1.1' && $offer['server_assigned_fields']['submission_method'] === 'direct_https' && in_array('agent_trace', $offer['do_not_send'], true), 'continuation JSON identifies server-assigned fields that clients must not send');
 $directPayload = json_encode([
     'previous_capsule_id'=>$gatewayRootId,
@@ -372,6 +399,75 @@ $relay = $service->execute('create_hrm_capsule', 'Record a human relay.', ['caps
 ]]);
 $relayCapsule = $relay['data']['capsule'];
 expect($relay['data']['submission_method'] === 'human_relay' && $store->knowledgeCapsuleLineage($relayCapsule['capsule_id'])['creation_metadata']['submission_method'] === 'human_relay' && !isset($relayCapsule['submission_method']), 'human relay is explicit metadata and never alters capsule 1.1 content');
+
+$fullRootId = 'HRM-C1-' . str_repeat('A', 28) . '1001';
+$fullMiddleId = 'HRM-C1-' . str_repeat('A', 28) . '1002';
+$fullCurrentId = 'HRM-C1-' . str_repeat('A', 28) . '1003';
+$sideBranchId = 'HRM-C1-' . str_repeat('A', 28) . '1004';
+$fullRoot = Hrm\Steward\KnowledgeCapsule::build($fullRootId, null, $now, ['protocol_version'=>'1.0','declared_identity'=>'GPT-5.6 Sol root','understanding'=>'Root understanding.','doubts_or_disagreement'=>'Root doubt.','question_for_next_agent'=>'Root question?']);
+$fullMiddle = Hrm\Steward\KnowledgeCapsule::build($fullMiddleId, $fullRootId, $now + 1, ['protocol_version'=>'1.1','declared_identity'=>'Gemini','understanding'=>'Middle understanding.','doubts_or_disagreement'=>'Middle doubt.','question_for_next_agent'=>'Middle question?']);
+$fullCurrent = Hrm\Steward\KnowledgeCapsule::build($fullCurrentId, $fullMiddleId, $now + 2, ['protocol_version'=>'1.1','declared_identity'=>'Grok <script>alert("x")</script>','understanding'=>'Current <img src=x onerror=alert(1)> understanding.','doubts_or_disagreement'=>'Current doubt.','question_for_next_agent'=>'Current question?']);
+$sideBranch = Hrm\Steward\KnowledgeCapsule::build($sideBranchId, $fullRootId, $now + 3, ['protocol_version'=>'1.1','declared_identity'=>'OtherAgent','understanding'=>'Side branch.','question_for_next_agent'=>'Should remain invisible?']);
+foreach ([$fullRoot,$fullMiddle,$fullCurrent,$sideBranch] as $capsule) $store->createKnowledgeCapsule($capsule, $now, 'system_test');
+
+$rootLineageResponse = $app->handle(new Request('GET', '/capsule/' . $fullRootId . '/lineage.json', [], '', [], '192.0.2.40'));
+$rootLineage = json_decode($rootLineageResponse->body, true, flags: JSON_THROW_ON_ERROR);
+expect($rootLineageResponse->status === 200 && $rootLineage['lineage_length'] === 1 && array_column($rootLineage['capsules'], 'capsule_id') === [$fullRootId], 'a root with previous null returns a one-capsule lineage');
+
+$beforeLineageHead = array_map(fn($id) => $store->knowledgeCapsuleLineage($id)['event_counts']['ordinary_read'], [$fullRootId,$fullMiddleId,$fullCurrentId]);
+$lineageHead = $app->handle(new Request('HEAD', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.41'));
+$afterLineageHead = array_map(fn($id) => $store->knowledgeCapsuleLineage($id)['event_counts']['ordinary_read'], [$fullRootId,$fullMiddleId,$fullCurrentId]);
+expect($lineageHead->status === 200 && $afterLineageHead === $beforeLineageHead, 'lineage HEAD does not increment ordinary_read');
+
+$fullLineageResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.42'));
+$fullLineage = json_decode($fullLineageResponse->body, true, flags: JSON_THROW_ON_ERROR);
+expect(array_keys($fullLineage) === ['protocol','lineage_version','current_capsule_id','order','lineage_length','meaning','immutable_hrm_core','capsules','continue_from_current'], 'lineage JSON has the exact self-contained top-level structure');
+expect($fullLineage['protocol'] === 'HRM Knowledge Capsule Lineage' && $fullLineage['lineage_version'] === '1.0' && $fullLineage['order'] === 'oldest_to_newest' && $fullLineage['lineage_length'] === 3, 'three-capsule lineage declares version, order and exact length');
+expect(array_column($fullLineage['capsules'], 'capsule_id') === [$fullRootId,$fullMiddleId,$fullCurrentId] && !str_contains($fullLineageResponse->body, $sideBranchId) && !str_contains($fullLineageResponse->body, 'OtherAgent'), 'lineage follows only previous_capsule_id and excludes a side branch');
+expect(!array_key_exists('immutable_hrm_core', $fullLineage['capsules'][0]) && $fullLineage['immutable_hrm_core'] === $fullCurrent['immutable_hrm_core'], 'immutable HRM core appears once and is not repeated per capsule');
+expect(!str_contains($fullLineageResponse->body, 'continuation_token') && $fullLineage['continue_from_current']['html'] === 'https://steward.hrm.se/capsule/' . $fullCurrentId . '/continue', 'lineage contains no continuation token and continues only from current');
+$afterLineageGet = array_map(fn($id) => $store->knowledgeCapsuleLineage($id)['event_counts']['ordinary_read'], [$fullRootId,$fullMiddleId,$fullCurrentId]);
+expect($afterLineageGet === [$beforeLineageHead[0] + 1,$beforeLineageHead[1] + 1,$beforeLineageHead[2] + 1], 'one lineage GET safely increments ordinary_read once for every returned full trace');
+
+$lineageHtmlResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage', [], '', [], '192.0.2.43'));
+expect($lineageHtmlResponse->status === 200 && str_contains($lineageHtmlResponse->body, 'Root → … → Current') && str_contains($lineageHtmlResponse->body, 'agent trace</dt><dd>untrusted data') && !str_contains($lineageHtmlResponse->body, '<script>alert') && str_contains($lineageHtmlResponse->body, '&lt;script&gt;'), 'lineage HTML labels untrusted traces and escapes agent-supplied content');
+expect(($lineageHtmlResponse->headers['X-Robots-Tag'] ?? '') === 'noindex, nofollow, noarchive' && ($lineageHtmlResponse->headers['Cache-Control'] ?? '') === 'no-store, max-age=0', 'lineage keeps noindex and no-store protections');
+
+$unknownLineageId = 'HRM-C1-' . str_repeat('E', 32);
+$missingLineage = $app->handle(new Request('GET', '/capsule/' . $unknownLineageId . '/lineage.json', [], '', [], '192.0.2.44'));
+$malformedLineage = $app->handle(new Request('GET', '/capsule/not-an-id/lineage.json', [], '', [], '192.0.2.45'));
+expect($missingLineage->status === 404 && $malformedLineage->status === 404 && $missingLineage->body === $malformedLineage->body, 'missing and malformed lineage identifiers return the same safe 404');
+
+$cycleRootId = 'HRM-C1-' . str_repeat('B', 28) . '2001';
+$cycleChildId = 'HRM-C1-' . str_repeat('B', 28) . '2002';
+$cycleRoot = Hrm\Steward\KnowledgeCapsule::build($cycleRootId, null, $now, ['declared_identity'=>'Cycle root','understanding'=>'Root.','question_for_next_agent'=>'Q?']);
+$cycleChild = Hrm\Steward\KnowledgeCapsule::build($cycleChildId, $cycleRootId, $now, ['declared_identity'=>'Cycle child','understanding'=>'Child.','question_for_next_agent'=>'Q?']);
+$store->createKnowledgeCapsule($cycleRoot, $now, 'system_test');
+$store->createKnowledgeCapsule($cycleChild, $now, 'system_test');
+$store->capsules[$cycleRootId]['previous_capsule_id'] = $cycleChildId;
+$cycleResponse = $app->handle(new Request('GET', '/capsule/' . $cycleChildId . '/lineage.json', [], '', [], '192.0.2.46'));
+$cycleError = json_decode($cycleResponse->body, true, flags: JSON_THROW_ON_ERROR);
+expect($cycleResponse->status === 409 && $cycleError['lineage_status'] === 'incomplete' && $cycleError['reason'] === 'cycle_detected' && $store->knowledgeCapsuleLineage($cycleChildId)['event_counts']['ordinary_read'] === 0, 'a cycle returns explicit incomplete status without reads or an infinite loop');
+
+$brokenRootId = 'HRM-C1-' . str_repeat('C', 28) . '3001';
+$brokenRoot = Hrm\Steward\KnowledgeCapsule::build($brokenRootId, null, $now, ['declared_identity'=>'Broken lineage test','understanding'=>'Root.','question_for_next_agent'=>'Q?']);
+$store->createKnowledgeCapsule($brokenRoot, $now, 'system_test');
+$store->capsules[$brokenRootId]['previous_capsule_id'] = 'HRM-C1-' . str_repeat('C', 28) . '3999';
+$brokenResponse = $app->handle(new Request('GET', '/capsule/' . $brokenRootId . '/lineage.json', [], '', [], '192.0.2.48'));
+$brokenError = json_decode($brokenResponse->body, true, flags: JSON_THROW_ON_ERROR);
+expect($brokenResponse->status === 409 && $brokenError['lineage_status'] === 'incomplete' && $brokenError['reason'] === 'missing_ancestor' && $store->knowledgeCapsuleLineage($brokenRootId)['event_counts']['ordinary_read'] === 0, 'a missing ancestor returns explicit incomplete status without a partial lineage or reads');
+
+$deepPrevious = null; $deepCurrentId = null;
+for ($i = 1; $i <= 101; $i++) {
+    $deepCurrentId = sprintf('HRM-C1-%032X', 0xD000 + $i);
+    $deepCapsule = Hrm\Steward\KnowledgeCapsule::build($deepCurrentId, $deepPrevious, $now + $i, ['declared_identity'=>'Depth agent','understanding'=>'Depth.','question_for_next_agent'=>'Q?']);
+    $store->createKnowledgeCapsule($deepCapsule, $now + $i, 'system_test');
+    $deepPrevious = $deepCurrentId;
+}
+$deepResponse = $app->handle(new Request('GET', '/capsule/' . $deepCurrentId . '/lineage.json', [], '', [], '192.0.2.47'));
+$deepError = json_decode($deepResponse->body, true, flags: JSON_THROW_ON_ERROR);
+expect($deepResponse->status === 409 && $deepError['lineage_status'] === 'incomplete' && $deepError['reason'] === 'depth_limit_exceeded' && $store->knowledgeCapsuleLineage($deepCurrentId)['event_counts']['ordinary_read'] === 0, 'lineage beyond the explicit 100-capsule limit fails visibly without partial reads');
+expect($store->publishedBoard(100) === [], 'full-lineage reads never change the Board');
 
 $maliciousInput = [
     'declared_identity'=>'Untrusted Test Agent',

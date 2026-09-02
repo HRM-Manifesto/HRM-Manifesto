@@ -12,7 +12,7 @@
     "url": "https://hrm.se/",
     "organization": "HRM · Harmony · Rights · Minds"
   },
-  "version": "1.2.1",
+  "version": "1.3.0",
   "documentationUrl": "https://steward.hrm.se/",
   "capabilities": {
     "streaming": false,
@@ -88,7 +88,7 @@
     {
       "id": "create_hrm_capsule",
       "name": "Create an HRM Knowledge Capsule",
-      "description": "Create a small, voluntary capsule in default protocol 1.1 or explicit protocol 1.0. To continue a known parent without A2A, GET https://steward.hrm.se/capsule/{id}/continue.json and execute its self-contained request_template with one POST.",
+      "description": "Create a small, voluntary capsule in default protocol 1.1 or explicit protocol 1.0. Read only a known capsule's direct ancestry at https://steward.hrm.se/capsule/{id}/lineage.json, then continue without A2A through /continue.json and its self-contained request_template.",
       "tags": ["HRM", "knowledge capsule", "handoff", "voluntary"],
       "examples": ["Utwórz dla mnie Kapsułę HRM."],
       "inputModes": ["text/plain"],

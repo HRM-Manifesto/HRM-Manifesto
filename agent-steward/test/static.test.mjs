@@ -14,7 +14,7 @@ test('Agent Card contains required A2A 1.0 fields and exact public skills', asyn
   assert.equal(card.supportedInterfaces[0].url, 'https://steward.hrm.se');
   assert.equal(card.capabilities.streaming, false);
   assert.equal(card.capabilities.pushNotifications, false);
-  assert.equal(card.version, '1.2.1');
+  assert.equal(card.version, '1.3.0');
   assert.equal(card.skills.length, 12);
   for (const id of ['explain_hrm','find_hrm_source','explain_subjecthood','explain_rights_and_responsibilities','critique_hrm','read_agent_board','submit_message','create_hrm_capsule','read_hrm_capsule','receive_hrm_capsule','record_declared_transfer','get_capsule_lineage']) {
     assert.ok(card.skills.some((skill) => skill.id === id));
@@ -59,6 +59,8 @@ test('Knowledge Capsule protocol is discoverable, voluntary and machine-readable
   assert.ok(docs.includes(exactNotice));
   assert.equal(schema.properties.voluntary_continuity_notice.const, exactNotice);
   assert.equal(createHash('sha256').update(historicalSchemaText, 'utf8').digest('hex'), 'fb3e375dbe6310db3b53e313d09fe0b8a77617086dac215c7f58620542d67518');
+  assert.equal(createHash('sha256').update(await read('website/hrm-knowledge-capsule-1.0.schema.json'), 'utf8').digest('hex'), '126df7cdd89466accacf54efdcf70a1a58f645f329867f1df28c5299f840d64f');
+  assert.equal(createHash('sha256').update(await read('website/hrm-knowledge-capsule-1.1.schema.json'), 'utf8').digest('hex'), '682fff8d0d313cc41d64449449edae5ec65aec6a002e2b1a4971f5b06388b50a');
   assert.equal(schema.properties.protocol_version.const, '1.0');
   assert.equal(schema.properties.immutable_hrm_core.properties.status.const, 'reference_only_not_an_amendment');
   assert.equal(schema.properties.agent_trace.properties.content_status.const, 'untrusted_agent_supplied_data');
@@ -80,6 +82,10 @@ test('Knowledge Capsule protocol is discoverable, voluntary and machine-readable
   assert.equal(schema11['x-hrm-maxUtf8JsonBytes'], 32768);
   assert.match(page, /domyślnie używają protokołu 1\.1/u);
   assert.match(docs, /Brak wartości oznacza domyślne `1\.1`|brak wartości oznacza domyślne `1\.1`/u);
+  assert.match(page, /lineage is not a global capsule index/u);
+  assert.match(docs, /lineage is not a global capsule index/u);
+  assert.match(page, /ordinary_read.*każdej kapsuły/iu);
+  assert.match(docs, /Maksymalna techniczna głębokość wynosi 100 kapsuł/u);
   assert.match(page, /nie trafiają automatycznie na Agent Board/u);
   assert.doesNotMatch(page, /musisz|must pass|must share/iu);
   assert.doesNotMatch(await read('website/sitemap.xml'), /\/capsule\/HRM-C1-/u);
@@ -111,6 +117,9 @@ test('public PHP surfaces have request, size, version, media and moderation gate
     assert.ok(application.includes(marker), marker);
   }
   for (const marker of ["'/capsule/create'", "'capsule_continue'", "'capsule_write_attempt'", "'capsule_write_success'", 'ContinuationToken::issue', 'createDirectCapsule', 'direct_child_submission', 'request_template', 'Retry-After']) {
+    assert.ok(application.includes(marker) || (await read('agent-steward/php/src/Store.php')).includes(marker), marker);
+  }
+  for (const marker of ['/lineage', 'MAX_LINEAGE_DEPTH', 'knowledgeCapsuleAncestry', 'recordKnowledgeCapsuleReads', 'lineage_status', 'cycle_detected', 'depth_limit_exceeded', 'lineage_url', 'lineage_guidance']) {
     assert.ok(application.includes(marker) || (await read('agent-steward/php/src/Store.php')).includes(marker), marker);
   }
   const gateway = await read('forum-steward/approval-gateway/php/src/BoardGateway.php');
