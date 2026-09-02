@@ -148,6 +148,7 @@ jobs:
           sudo apt-get update >/dev/null
           sudo apt-get install -y php-cli >/dev/null
           export BOARD_ADMIN_PASSWORD_HASH="$(php -r 'echo password_hash(getenv("BOARD_ADMIN_PASSWORD"), PASSWORD_DEFAULT);')"
+          php -r '$hash = getenv("BOARD_ADMIN_PASSWORD_HASH"); exit(is_string($hash) && password_verify(getenv("BOARD_ADMIN_PASSWORD"), $hash) ? 0 : 1);'
           python - <<'PY'
           import json, os, pathlib
           def php(value): return "'" + value.replace('\\', '\\\\').replace("'", "\\'") + "'"
@@ -174,6 +175,7 @@ jobs:
           STEWARD_FTPS_PASSWORD: ${{ secrets.STEWARD_FTPS_PASSWORD }}
           GATEWAY_FTPS_USERNAME: ${{ secrets.GATEWAY_FTPS_USERNAME }}
           GATEWAY_FTPS_PASSWORD: ${{ secrets.GATEWAY_FTPS_PASSWORD }}
+          BOARD_ADMIN_PASSWORD: ${{ secrets.BOARD_ADMIN_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -198,6 +200,14 @@ jobs:
           upload_if_missing "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD" config.php runtime-config/steward-config.php
           curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" --upload-file runtime-config/gateway-board-config.php ftp://ftpcluster.loopia.se/board-config.php
           curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" --upload-file runtime-config/gateway-board-config.json ftp://ftpcluster.loopia.se/board-config.json
+          mkdir -p remote-verify
+          curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" ftp://ftpcluster.loopia.se/public_html/index.php --output remote-verify/index.php
+          curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" ftp://ftpcluster.loopia.se/src/BoardAdmin.php --output remote-verify/BoardAdmin.php
+          curl --fail --silent --show-error --ftp-ssl-reqd --user "$GATEWAY_FTPS_USERNAME:$GATEWAY_FTPS_PASSWORD" ftp://ftpcluster.loopia.se/board-config.php --output remote-verify/board-config.php
+          cmp payload/gateway/public_html/index.php remote-verify/index.php
+          cmp payload/gateway/src/BoardAdmin.php remote-verify/BoardAdmin.php
+          php -r '$config = require "remote-verify/board-config.php"; exit(is_array($config) && password_verify(getenv("BOARD_ADMIN_PASSWORD"), (string) ($config["admin_password_hash"] ?? "")) ? 0 : 1);'
+          rm -f remote-verify/board-config.php
       - name: Verify public HTTPS services
         shell: bash
         run: |

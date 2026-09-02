@@ -46,5 +46,7 @@ test('service deployment saves an exact rollback artifact before code deployment
   const workflow = await readFile(path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'hrm-services-deploy.yml'), 'utf8');
   assert.match(workflow, /Save code rollback artifact before deployment/);
   assert.doesNotMatch(workflow, /mariadb-dump/);
+  assert.match(workflow, /password_verify\(getenv\("BOARD_ADMIN_PASSWORD"\)/);
+  assert.match(workflow, /cmp payload\/gateway\/src\/BoardAdmin\.php remote-verify\/BoardAdmin\.php/);
   assert.ok(workflow.indexOf('Save code rollback artifact before deployment') < workflow.indexOf('Deploy tested code and create missing configuration'));
 });
