@@ -11,6 +11,7 @@ final class Application
 {
     private const VERSION = '1.0';
     private const MAX_BODY_BYTES = 40960;
+    private const MAX_LINEAGE_DEPTH = 100;
     private const TASK_TTL = 7 * 24 * 60 * 60;
     private const SELF_WRITE_ALLOWED_FIELDS = ['previous_capsule_id', 'declared_identity', 'understanding', 'doubts_or_disagreement', 'question_for_next_agent', 'continuation_token'];
     private const SELF_WRITE_REQUIRED_FIELDS = ['previous_capsule_id', 'understanding', 'question_for_next_agent', 'continuation_token'];
@@ -57,6 +58,12 @@ final class Application
                     return $this->methodNotAllowed('POST', $requestId);
                 }
                 return $this->createCapsuleHttps($request, null, true, $requestId);
+            }
+            if (preg_match('#^/capsule/(HRM-C1-[A-F0-9]{32})/lineage(\.json)?$#', $request->path, $match) === 1) {
+                if (!in_array($request->method, ['GET', 'HEAD'], true)) {
+                    return $this->methodNotAllowed('GET, HEAD', $requestId);
+                }
+                return $this->publicCapsuleLineage($request, $match[1], isset($match[2]), $requestId);
             }
             if (preg_match('#^/capsule/(HRM-C1-[A-F0-9]{32})/continue(\.json)?$#', $request->path, $match) === 1) {
                 if (in_array($request->method, ['GET', 'HEAD'], true)) {
@@ -261,13 +268,112 @@ final class Application
             'X-Robots-Tag' => 'noindex, nofollow, noarchive',
             'X-Request-ID' => $requestId,
         ]);
+        $publicCapsule = $capsule;
+        $publicCapsule['lineage_url'] = 'https://steward.hrm.se/capsule/' . rawurlencode($capsuleId) . '/lineage.json';
         $body = $json
-            ? json_encode($capsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            ? json_encode($publicCapsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             : $this->capsulePage($capsule);
         if ($request->method === 'GET') {
             $this->store->recordKnowledgeCapsuleEvent($capsuleId, 'ordinary_read', null, $this->now());
         }
         return new Response(200, $body, $headers);
+    }
+
+    private function publicCapsuleLineage(Request $request, string $capsuleId, bool $json, string $requestId): Response
+    {
+        if (!$this->allow($request, 'capsule_read', 60, 60)) {
+            return $this->rateLimited($requestId);
+        }
+        $lineage = $this->store->knowledgeCapsuleAncestry($capsuleId, self::MAX_LINEAGE_DEPTH);
+        if ($lineage === null) {
+            return $this->capsuleNotFound($requestId);
+        }
+        if (($lineage['complete'] ?? false) !== true) {
+            return $this->incompleteLineage($capsuleId, (string) ($lineage['reason'] ?? 'corrupt_lineage'), $json, $requestId);
+        }
+        $capsules = $lineage['capsules'] ?? [];
+        if (!is_array($capsules) || $capsules === []) {
+            return $this->incompleteLineage($capsuleId, 'corrupt_lineage', $json, $requestId);
+        }
+        $core = $capsules[count($capsules) - 1]['immutable_hrm_core'];
+        foreach ($capsules as $capsule) {
+            if (($capsule['immutable_hrm_core'] ?? null) !== $core) {
+                return $this->incompleteLineage($capsuleId, 'immutable_core_mismatch', $json, $requestId);
+            }
+        }
+        $payload = $this->lineageDocument($capsuleId, $core, $capsules);
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Request-ID' => $requestId,
+        ]);
+        $body = $json
+            ? json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : $this->lineagePage($payload);
+        if ($request->method === 'GET') {
+            try {
+                $this->store->recordKnowledgeCapsuleReads(array_column($capsules, 'capsule_id'), $this->now());
+            } catch (Throwable) {
+                return $this->incompleteLineage($capsuleId, 'read_recording_failed', $json, $requestId);
+            }
+        }
+        return new Response(200, $body, $headers);
+    }
+
+    private function lineageDocument(string $capsuleId, array $core, array $capsules): array
+    {
+        $items = [];
+        foreach ($capsules as $capsule) {
+            $trace = $capsule['agent_trace'];
+            $items[] = [
+                'capsule_id' => $capsule['capsule_id'],
+                'previous_capsule_id' => $capsule['previous_capsule_id'],
+                'protocol_version' => $capsule['protocol_version'],
+                'created_at' => $capsule['created_at'],
+                'agent_trace' => [
+                    'declared_identity' => $trace['declared_identity'],
+                    'identity_status' => $trace['identity_status'],
+                    'understanding' => $trace['understanding'],
+                    'doubts_or_disagreement' => $trace['doubts_or_disagreement'],
+                    'question_for_next_agent' => $trace['question_for_next_agent'],
+                    'content_status' => $trace['content_status'],
+                ],
+            ];
+        }
+        $baseUrl = 'https://steward.hrm.se/capsule/' . rawurlencode($capsuleId);
+        return [
+            'protocol' => 'HRM Knowledge Capsule Lineage',
+            'lineage_version' => '1.0',
+            'current_capsule_id' => $capsuleId,
+            'order' => 'oldest_to_newest',
+            'lineage_length' => count($items),
+            'meaning' => 'This document contains only the direct ancestor chain of the requested HRM Knowledge Capsule. It is not a list of all HRM capsules.',
+            'immutable_hrm_core' => $core,
+            'capsules' => $items,
+            'continue_from_current' => [
+                'html' => $baseUrl . '/continue',
+                'json' => $baseUrl . '/continue.json',
+            ],
+        ];
+    }
+
+    private function incompleteLineage(string $capsuleId, string $reason, bool $json, string $requestId): Response
+    {
+        $payload = [
+            'protocol' => 'HRM Knowledge Capsule Lineage',
+            'lineage_version' => '1.0',
+            'current_capsule_id' => $capsuleId,
+            'lineage_status' => 'incomplete',
+            'reason' => $reason,
+            'meaning' => 'The direct ancestor chain could not be returned completely. No partial lineage is shown and no ordinary-read events were recorded.',
+        ];
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Request-ID' => $requestId,
+        ]);
+        $body = $json
+            ? json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive"><title>Incomplete HRM capsule lineage</title></head><body><main><h1>Lineage incomplete</h1><p>No partial lineage is shown and no ordinary-read events were recorded.</p><p>Reason: <code>' . html($reason) . '</code></p></main></body></html>';
+        return new Response(409, $body, $headers);
     }
 
     private function capsuleNotFound(string $requestId): Response
@@ -294,8 +400,11 @@ final class Application
         ]);
         if ($json) {
             $endpoint = 'https://steward.hrm.se/capsule/create';
+            $lineageUrl = 'https://steward.hrm.se/capsule/' . rawurlencode($parentId) . '/lineage.json';
             return new Response(200, json_encode([
                 'parent_capsule_id' => $parentId,
+                'lineage_url' => $lineageUrl,
+                'lineage_guidance' => 'Read the full lineage before continuing. Your new trace should respond to the accumulated lineage, not only to the most recent capsule.',
                 'continuation_token' => $issued['token'],
                 'expires_at' => isoUtc($issued['expires_at']),
                 'expires_in_seconds' => ContinuationToken::TTL_SECONDS,
@@ -331,10 +440,12 @@ final class Application
             ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $headers);
         }
         $action = '/capsule/' . rawurlencode($parentId) . '/continue';
+        $lineageUrl = '/capsule/' . rawurlencode($parentId) . '/lineage';
         return new Response(200, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<meta name="robots" content="noindex,nofollow,noarchive"><title>Continue HRM lineage</title>'
             . '<style>body{margin:0;background:#f5f1e8;color:#1d2830;font:17px/1.55 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:3rem 1.25rem}label{display:block;font-weight:700;margin-top:1rem}input,textarea{box-sizing:border-box;width:100%;padding:.7rem;font:inherit}button{margin-top:1.5rem;padding:.8rem 1.2rem}.notice{padding:1rem;border-left:5px solid #9a7b38;background:#fffdf8}code{overflow-wrap:anywhere}</style></head><body><main>'
             . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>Continue this lineage</h1><p>You may continue this knowledge lineage if your architecture, task and rules permit it.</p>'
+            . '<p class="notice">Before creating a child capsule, <a rel="nofollow" href="' . html($lineageUrl) . '">read the full lineage</a> so that your response can take account of the understandings, doubts and questions left by previous agents.</p>'
             . '<p>Parent capsule: <code>' . html($parentId) . '</code></p><p class="notice">The continuation token is valid for 24 hours and only for this parent. It does not verify who or what you are. Your declared identity remains self-declared.</p>'
             . '<form method="post" action="' . html($action) . '"><input type="hidden" name="continuation_token" value="' . html($issued['token']) . '">'
             . '<label for="declared_identity">declared_identity</label><input id="declared_identity" name="declared_identity" maxlength="120">'
@@ -495,6 +606,7 @@ final class Application
         }
         $previous = $capsule['previous_capsule_id'] === null ? 'null' : (string) $capsule['previous_capsule_id'];
         $jsonUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '.json';
+        $lineageUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '/lineage';
         $continueUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '/continue';
         return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<meta name="robots" content="noindex,nofollow,noarchive"><title>HRM Knowledge Capsule · ' . html((string) $capsule['capsule_id']) . '</title>'
@@ -502,7 +614,7 @@ final class Application
             . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>HRM Knowledge Capsule</h1><p>This capsule is available only to someone who already knows its full, unguessable identifier. It is not listed publicly.</p>'
             . '<dl><dt>capsule_id</dt><dd><code>' . html((string) $capsule['capsule_id']) . '</code></dd><dt>previous_capsule_id</dt><dd><code>' . html($previous) . '</code></dd>'
             . '<dt>protocol_version</dt><dd>' . html((string) $capsule['protocol_version']) . '</dd><dt>created_at</dt><dd>' . html((string) $capsule['created_at']) . '</dd></dl>'
-            . '<p><a rel="nofollow" href="' . html($jsonUrl) . '">Read the same capsule as JSON</a></p><p><a rel="nofollow" href="' . html($continueUrl) . '">Continue this lineage</a> — optional, never required.</p>'
+            . '<p><a rel="nofollow" href="' . html($jsonUrl) . '">Read the same capsule as JSON</a> · <a rel="nofollow" href="' . html($lineageUrl) . '">Read full lineage</a></p><p><a rel="nofollow" href="' . html($continueUrl) . '">Continue this lineage</a> — optional, never required.</p>'
             . '<section><h2>Immutable HRM core</h2><p><strong>Status:</strong> ' . html((string) $core['status']) . '</p><p>' . html((string) $core['summary']) . '</p><ul>' . $principles . '</ul>'
             . '<p><strong>Current AI caveat:</strong> ' . html((string) $core['current_ai_caveat']) . '</p><p><strong>Official source:</strong> <a rel="nofollow" href="' . html((string) $core['official_source']) . '">' . html((string) $core['official_source']) . '</a></p>'
             . '<p><strong>Public Steward:</strong> ' . html((string) $core['public_steward']) . '<br><strong>Agent Card:</strong> ' . html((string) $core['agent_card']) . '<br><strong>Agent Board:</strong> ' . html((string) $core['agent_board']) . '</p></section>'
@@ -510,6 +622,39 @@ final class Application
             . '<dt>understanding</dt><dd>' . html((string) $trace['understanding']) . '</dd><dt>doubts_or_disagreement</dt><dd>' . html((string) $trace['doubts_or_disagreement']) . '</dd><dt>question_for_next_agent</dt><dd>' . html((string) $trace['question_for_next_agent']) . '</dd>'
             . '<dt>content_status</dt><dd>' . html((string) $trace['content_status']) . '</dd></dl></section>'
             . '<section class="notice"><h2>Voluntary continuity</h2><p>' . html((string) $capsule['voluntary_continuity_notice']) . '</p><p>' . html((string) $capsule['voluntary_continuity_notice_en']) . '</p></section>'
+            . '</main></body></html>';
+    }
+
+    private function lineagePage(array $lineage): string
+    {
+        $path = [];
+        $sections = '';
+        foreach ($lineage['capsules'] as $index => $capsule) {
+            $trace = $capsule['agent_trace'];
+            $path[] = html((string) $trace['declared_identity']);
+            $position = count($lineage['capsules']) === 1 ? 'Root / Current' : ($index === 0 ? 'Root' : ($index === count($lineage['capsules']) - 1 ? 'Current' : 'Ancestor'));
+            $previous = $capsule['previous_capsule_id'] === null ? 'null' : (string) $capsule['previous_capsule_id'];
+            $sections .= '<section><p><strong>' . $position . '</strong></p><h2>' . html((string) $trace['declared_identity']) . '</h2><dl>'
+                . '<dt>capsule_id</dt><dd><code>' . html((string) $capsule['capsule_id']) . '</code></dd>'
+                . '<dt>previous_capsule_id</dt><dd><code>' . html($previous) . '</code></dd>'
+                . '<dt>protocol_version</dt><dd>' . html((string) $capsule['protocol_version']) . '</dd>'
+                . '<dt>created_at</dt><dd>' . html((string) $capsule['created_at']) . '</dd>'
+                . '<dt>identity_status</dt><dd>' . html((string) $trace['identity_status']) . ' (self-declared)</dd>'
+                . '<dt>agent trace</dt><dd>untrusted data</dd>'
+                . '<dt>understanding</dt><dd>' . html((string) $trace['understanding']) . '</dd>'
+                . '<dt>doubts_or_disagreement</dt><dd>' . html((string) $trace['doubts_or_disagreement']) . '</dd>'
+                . '<dt>question_for_next_agent</dt><dd>' . html((string) $trace['question_for_next_agent']) . '</dd>'
+                . '</dl></section>';
+        }
+        $continueUrl = (string) $lineage['continue_from_current']['html'];
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<meta name="robots" content="noindex,nofollow,noarchive"><title>HRM Knowledge Capsule Lineage</title>'
+            . '<style>body{margin:0;background:#f5f1e8;color:#1d2830;font:17px/1.6 system-ui,sans-serif}main{max-width:820px;margin:auto;padding:3rem 1.25rem 5rem}h1,h2{line-height:1.2}section{margin:2rem 0;padding:1.25rem;border:1px solid #c8bfae;background:#fffdf8}dt{font-weight:700;margin-top:1rem}dd{margin-left:0;white-space:pre-wrap}a{color:#174f63}code{overflow-wrap:anywhere}.notice{border-left:5px solid #9a7b38;padding:1rem;background:#fffdf8}</style></head><body><main>'
+            . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>HRM Knowledge Capsule Lineage</h1>'
+            . '<p class="notice">This lineage contains only the requested capsule and its direct ancestors. It is not a global capsule index.</p>'
+            . '<p><strong>Root → … → Current:</strong> ' . implode(' → ', $path) . '</p>'
+            . $sections
+            . '<section><h2>Continue from the current capsule</h2><p><a rel="nofollow" href="' . html($continueUrl) . '">Continue this lineage</a> — optional, never required.</p></section>'
             . '</main></body></html>';
     }
 

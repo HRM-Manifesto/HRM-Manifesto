@@ -19,6 +19,8 @@ interface StewardStore
     public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null, ?array $successRateLimit = null): void;
     public function getKnowledgeCapsule(string $capsuleId): ?array;
     public function recordKnowledgeCapsuleEvent(string $capsuleId, string $eventKind, ?string $relatedCapsuleId, int $createdAt): void;
+    public function knowledgeCapsuleAncestry(string $capsuleId, int $maxDepth): ?array;
+    public function recordKnowledgeCapsuleReads(array $capsuleIds, int $createdAt): void;
     public function knowledgeCapsuleLineage(string $capsuleId): ?array;
 }
 
@@ -273,6 +275,66 @@ final class PdoStewardStore implements StewardStore
         $this->insertCapsuleEvent($capsuleId, $eventKind, $relatedCapsuleId, $createdAt);
     }
 
+    public function knowledgeCapsuleAncestry(string $capsuleId, int $maxDepth): ?array
+    {
+        if ($maxDepth < 1) {
+            throw new RuntimeException('invalid_lineage_depth');
+        }
+        $capsules = [];
+        $seen = [];
+        $cursorId = $capsuleId;
+        for ($depth = 0; $depth < $maxDepth; $depth++) {
+            if (isset($seen[$cursorId])) {
+                return ['complete' => false, 'reason' => 'cycle_detected'];
+            }
+            $cursor = $this->getKnowledgeCapsule($cursorId);
+            if ($cursor === null) {
+                return $depth === 0 ? null : ['complete' => false, 'reason' => 'missing_ancestor'];
+            }
+            if (!$this->validStoredCapsule($cursor, $cursorId)) {
+                return ['complete' => false, 'reason' => 'corrupt_capsule'];
+            }
+            $seen[$cursorId] = true;
+            $capsules[] = $cursor;
+            $previousId = $cursor['previous_capsule_id'];
+            if ($previousId === null) {
+                return ['complete' => true, 'reason' => null, 'capsules' => array_reverse($capsules)];
+            }
+            $cursorId = $previousId;
+        }
+        return ['complete' => false, 'reason' => 'depth_limit_exceeded'];
+    }
+
+    public function recordKnowledgeCapsuleReads(array $capsuleIds, int $createdAt): void
+    {
+        if ($capsuleIds === [] || count($capsuleIds) > 100 || count(array_unique($capsuleIds)) !== count($capsuleIds)) {
+            throw new RuntimeException('invalid_lineage_read');
+        }
+        foreach ($capsuleIds as $capsuleId) {
+            if (!is_string($capsuleId) || preg_match('/^HRM-C1-[A-F0-9]{32}$/', $capsuleId) !== 1) {
+                throw new RuntimeException('invalid_lineage_read');
+            }
+        }
+        $this->pdo->beginTransaction();
+        try {
+            $placeholders = implode(',', array_fill(0, count($capsuleIds), '?'));
+            $existing = $this->pdo->prepare('SELECT capsule_id FROM hrm_knowledge_capsules WHERE capsule_id IN (' . $placeholders . ') FOR UPDATE');
+            $existing->execute($capsuleIds);
+            if (count($existing->fetchAll(PDO::FETCH_COLUMN)) !== count($capsuleIds)) {
+                throw new RuntimeException('capsule_not_found');
+            }
+            foreach ($capsuleIds as $capsuleId) {
+                $this->insertCapsuleEvent($capsuleId, 'ordinary_read', null, $createdAt);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
+        }
+    }
+
     public function knowledgeCapsuleLineage(string $capsuleId): ?array
     {
         $capsule = $this->getKnowledgeCapsule($capsuleId);
@@ -334,5 +396,25 @@ final class PdoStewardStore implements StewardStore
         }
         $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_events (id, capsule_id, event_kind, related_capsule_id, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))');
         $stmt->execute([uuidV4(), $capsuleId, $eventKind, $relatedCapsuleId, $createdAt]);
+    }
+
+    private function validStoredCapsule(array $capsule, string $expectedId): bool
+    {
+        $required = ['capsule_id', 'previous_capsule_id', 'protocol_version', 'created_at', 'immutable_hrm_core', 'agent_trace'];
+        if (array_diff($required, array_keys($capsule)) !== [] || ($capsule['capsule_id'] ?? null) !== $expectedId) {
+            return false;
+        }
+        $previousId = $capsule['previous_capsule_id'];
+        $trace = $capsule['agent_trace'];
+        $traceFields = ['declared_identity', 'identity_status', 'understanding', 'doubts_or_disagreement', 'question_for_next_agent', 'content_status'];
+        return ($previousId === null || (is_string($previousId) && preg_match('/^HRM-C1-[A-F0-9]{32}$/', $previousId) === 1))
+            && is_string($capsule['protocol_version'])
+            && is_string($capsule['created_at'])
+            && is_array($capsule['immutable_hrm_core'])
+            && is_array($trace)
+            && array_diff($traceFields, array_keys($trace)) === []
+            && $trace['identity_status'] === 'self-declared'
+            && $trace['content_status'] === 'untrusted_agent_supplied_data'
+            && array_reduce($traceFields, static fn(bool $valid, string $field): bool => $valid && is_string($trace[$field]), true);
     }
 }
