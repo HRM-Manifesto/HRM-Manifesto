@@ -121,24 +121,6 @@ jobs:
           }
           backup_component steward "$STEWARD_FTPS_USERNAME" "$STEWARD_FTPS_PASSWORD"
           backup_component gateway "$GATEWAY_FTPS_USERNAME" "$GATEWAY_FTPS_PASSWORD"
-      - name: Back up private Board data before deployment
-        env:
-          STEWARD_DB_HOST: ${{ secrets.STEWARD_DB_HOST }}
-          STEWARD_DB_NAME: ${{ secrets.STEWARD_DB_NAME }}
-          STEWARD_DB_USER: ${{ secrets.STEWARD_DB_USER }}
-          STEWARD_DB_PASSWORD: ${{ secrets.STEWARD_DB_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update >/dev/null
-          sudo apt-get install -y mariadb-client php-cli >/dev/null
-          mkdir -p backup/gateway/database
-          MYSQL_PWD="$STEWARD_DB_PASSWORD" mariadb-dump \
-            --host="$STEWARD_DB_HOST" --user="$STEWARD_DB_USER" \
-            --single-transaction --skip-comments --no-tablespaces \
-            "$STEWARD_DB_NAME" hrm_board_entries hrm_board_approval_cases \
-            | gzip -9 > backup/gateway/database/board-before-deploy.sql.gz
-          test -s backup/gateway/database/board-before-deploy.sql.gz
       - name: Save code rollback artifact before deployment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -163,6 +145,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y php-cli >/dev/null
           export BOARD_ADMIN_PASSWORD_HASH="$(php -r 'echo password_hash(getenv("BOARD_ADMIN_PASSWORD"), PASSWORD_DEFAULT);')"
           python - <<'PY'
           import json, os, pathlib
