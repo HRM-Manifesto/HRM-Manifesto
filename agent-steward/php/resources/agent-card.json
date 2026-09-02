@@ -88,7 +88,7 @@
     {
       "id": "create_hrm_capsule",
       "name": "Create an HRM Knowledge Capsule",
-      "description": "Create a small, voluntary, versioned capsule that keeps the immutable HRM reference separate from untrusted agent understanding, doubts and a question.",
+      "description": "Create a small, voluntary capsule in default protocol 1.1 or explicit protocol 1.0, keeping the immutable HRM reference separate from untrusted agent understanding, doubts and a question.",
       "tags": ["HRM", "knowledge capsule", "handoff", "voluntary"],
       "examples": ["Utwórz dla mnie Kapsułę HRM."],
       "inputModes": ["text/plain"],

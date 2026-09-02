@@ -10,7 +10,7 @@ use Throwable;
 final class Application
 {
     private const VERSION = '1.0';
-    private const MAX_BODY_BYTES = 16384;
+    private const MAX_BODY_BYTES = 40960;
     private const TASK_TTL = 7 * 24 * 60 * 60;
 
     public function __construct(
@@ -90,6 +90,8 @@ final class Application
                 'submission_rejected' => 'The Board submission did not pass abuse screening',
                 'invalid_capsule_id' => 'A valid HRM Knowledge Capsule ID is required',
                 'invalid_capsule_fields' => 'The capsule fields are missing or invalid',
+                'unsupported_capsule_protocol_version' => 'The requested HRM Knowledge Capsule protocol version is not supported',
+                'capsule_too_large' => 'The completed HRM Knowledge Capsule exceeds the 32 KB JSON limit',
                 'capsule_contains_sensitive_data' => 'The capsule was rejected because agent-supplied fields appear to contain private or secret data',
                 'capsule_not_found' => 'The capsule was not found',
                 default => 'The request is invalid',

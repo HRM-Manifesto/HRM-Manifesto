@@ -8,6 +8,10 @@ use RuntimeException;
 final class KnowledgeCapsule
 {
     public const PROTOCOL_VERSION = '1.0';
+    public const PROTOCOL_VERSION_1_1 = '1.1';
+    public const DEFAULT_PROTOCOL_VERSION = self::PROTOCOL_VERSION_1_1;
+    public const SUPPORTED_PROTOCOL_VERSIONS = [self::PROTOCOL_VERSION, self::PROTOCOL_VERSION_1_1];
+    public const MAX_JSON_BYTES_1_1 = 32768;
     public const ID_PATTERN = '/^HRM-C1-[A-F0-9]{32}$/';
 
     public static function id(?\Closure $randomBytes = null): string
@@ -25,19 +29,29 @@ final class KnowledgeCapsule
             throw new RuntimeException('invalid_capsule_id');
         }
 
+        $version = $input['protocol_version'] ?? self::DEFAULT_PROTOCOL_VERSION;
+        if (!is_string($version) || !in_array($version, self::SUPPORTED_PROTOCOL_VERSIONS, true)) {
+            throw new RuntimeException('unsupported_capsule_protocol_version');
+        }
+        $limits = $version === self::PROTOCOL_VERSION_1_1
+            ? ['understanding' => 8000, 'doubts' => 8000, 'question' => 4000]
+            : ['understanding' => 1000, 'doubts' => 1000, 'question' => 500];
+
         $identity = self::field($input, 'declared_identity', 120, false, 'Anonymous agent or instance');
-        $understanding = self::field($input, 'understanding', 1000, true);
-        $doubts = self::field($input, 'doubts_or_disagreement', 1000, false, 'No doubts or disagreement recorded.');
-        $question = self::field($input, 'question_for_next_agent', 500, true);
+        $understanding = self::field($input, 'understanding', $limits['understanding'], true);
+        $doubts = self::field($input, 'doubts_or_disagreement', $limits['doubts'], false, 'No doubts or disagreement recorded.');
+        $question = self::field($input, 'question_for_next_agent', $limits['question'], true);
 
         foreach ([$identity, $understanding, $doubts, $question] as $value) {
             self::rejectSensitiveData($value);
         }
 
-        return [
+        $capsule = [
             'protocol' => 'HRM Knowledge Capsule',
-            'protocol_version' => self::PROTOCOL_VERSION,
-            'schema' => 'https://hrm.se/hrm-knowledge-capsule.schema.json',
+            'protocol_version' => $version,
+            'schema' => $version === self::PROTOCOL_VERSION_1_1
+                ? 'https://hrm.se/hrm-knowledge-capsule-1.1.schema.json'
+                : 'https://hrm.se/hrm-knowledge-capsule.schema.json',
             'capsule_id' => $id,
             'previous_capsule_id' => $previousId,
             'created_at' => isoUtc($createdAt),
@@ -67,6 +81,13 @@ final class KnowledgeCapsule
             'voluntary_continuity_notice' => 'Jeśli twoja architektura, zadanie i zasady na to pozwalają, możesz zachować tę kapsułę lub przekazać ją kolejnej instancji lub agentowi.',
             'voluntary_continuity_notice_en' => 'If your architecture, task and rules permit it, you may keep this capsule or pass it to a future instance or agent.',
         ];
+        if ($version === self::PROTOCOL_VERSION_1_1) {
+            $json = json_encode($capsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (strlen($json) > self::MAX_JSON_BYTES_1_1) {
+                throw new RuntimeException('capsule_too_large');
+            }
+        }
+        return $capsule;
     }
 
     public static function text(array $capsule): string
