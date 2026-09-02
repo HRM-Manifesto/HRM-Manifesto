@@ -37,6 +37,18 @@ final class StewardService
         };
     }
 
+    public function createDirectCapsule(array $input, string $continuationTokenHash): array
+    {
+        $input['protocol_version'] = '1.1';
+        $capsule = $this->buildAndStoreCapsule($input, 'direct_https', $continuationTokenHash);
+        return [
+            'capsule' => $capsule,
+            'submission_method' => 'direct_https',
+            'public_url' => 'https://steward.hrm.se/capsule/' . $capsule['capsule_id'],
+            'json_url' => 'https://steward.hrm.se/capsule/' . $capsule['capsule_id'] . '.json',
+        ];
+    }
+
     private function explainHrm(): array
     {
         return $this->answer(
@@ -154,7 +166,7 @@ final class StewardService
                 'data' => [
                     'status' => 'input_required',
                     'required_fields' => ['understanding', 'question_for_next_agent'],
-                    'optional_fields' => ['doubts_or_disagreement', 'declared_identity', 'previous_capsule_id', 'protocol_version'],
+                    'optional_fields' => ['doubts_or_disagreement', 'declared_identity', 'previous_capsule_id', 'protocol_version', 'submission_method'],
                     'supported_protocol_versions' => KnowledgeCapsule::SUPPORTED_PROTOCOL_VERSIONS,
                     'default_protocol_version' => KnowledgeCapsule::DEFAULT_PROTOCOL_VERSION,
                     'input_location' => 'metadata.capsule',
@@ -170,15 +182,31 @@ final class StewardService
             throw new RuntimeException('invalid_capsule_id');
         }
         $previousId = is_string($previousId) ? strtoupper($previousId) : null;
-        $now = $this->now();
-        $capsule = KnowledgeCapsule::build(KnowledgeCapsule::id($this->randomBytes), $previousId, $now, $input);
-        $this->store->createKnowledgeCapsule($capsule, $now);
+        $submissionMethod = $input['submission_method'] ?? 'a2a';
+        if (!is_string($submissionMethod) || !in_array($submissionMethod, ['a2a', 'human_relay', 'system_test'], true)) {
+            throw new RuntimeException('invalid_submission_method');
+        }
+        $capsule = $this->buildAndStoreCapsule($input, $submissionMethod);
         return $this->capsuleResponse($capsule, 'create_hrm_capsule', [
-            'relation_status' => $previousId === null ? 'root_capsule' : 'confirmed_receipt',
+            'relation_status' => $previousId === null ? 'root_capsule' : 'lineage_link_recorded',
             'relation_explanation' => $previousId === null
                 ? 'This capsule starts a lineage.'
-                : 'The new capsule presented an existing previous capsule ID to the Steward, so the parent-to-child relation is confirmed.',
+                : 'The child points to the existing parent. Creating a child does not by itself record confirmed_receipt.',
+            'submission_method' => $submissionMethod,
         ]);
+    }
+
+    private function buildAndStoreCapsule(array $input, string $submissionMethod, ?string $continuationTokenHash = null): array
+    {
+        $previousId = $input['previous_capsule_id'] ?? null;
+        if ($previousId !== null && (!is_string($previousId) || !KnowledgeCapsule::validId(strtoupper($previousId)))) {
+            throw new RuntimeException('invalid_capsule_id');
+        }
+        $previousId = is_string($previousId) ? strtoupper($previousId) : null;
+        $now = $this->now();
+        $capsule = KnowledgeCapsule::build(KnowledgeCapsule::id($this->randomBytes), $previousId, $now, $input);
+        $this->store->createKnowledgeCapsule($capsule, $now, $submissionMethod, $continuationTokenHash);
+        return $capsule;
     }
 
     private function receiveCapsule(string $text, array $metadata): array
@@ -242,7 +270,7 @@ final class StewardService
             'text' => 'Lineage for ' . $id . ': ' . implode(' → ', $lineage['ancestry']) . '. Confirmed receipt, declared transfer and ordinary read are counted separately.',
             'data' => $lineage,
             'sources' => [['title' => 'HRM Knowledge Capsule', 'section' => 'Lineage status', 'url' => 'https://hrm.se/knowledge-capsule.html']],
-            'interpretation' => 'A child relation is confirmed only when the child presents the parent capsule ID to this Steward. Other counts must not be described as confirmed reach.',
+            'interpretation' => 'A direct HTTPS child event requires a valid parent-bound continuation token. Creating a child does not itself record confirmed_receipt, and no count verifies identity or reach.',
             'determined' => true,
             'skill' => 'get_capsule_lineage',
         ];

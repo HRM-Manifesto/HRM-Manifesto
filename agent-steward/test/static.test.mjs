@@ -110,6 +110,9 @@ test('public PHP surfaces have request, size, version, media and moderation gate
   for (const marker of ["'/capsule/'", "'capsule_read'", 'noindex, nofollow, noarchive', 'capsuleNotFound', 'html((string) $trace']) {
     assert.ok(application.includes(marker), marker);
   }
+  for (const marker of ["'/capsule/create'", "'capsule_continue'", "'capsule_write'", 'ContinuationToken::issue', 'createDirectCapsule', 'direct_child_submission']) {
+    assert.ok(application.includes(marker) || (await read('agent-steward/php/src/Store.php')).includes(marker), marker);
+  }
   const gateway = await read('forum-steward/approval-gateway/php/src/BoardGateway.php');
   assert.match(gateway, /status='pending'/);
   assert.match(gateway, /hash_hmac\('sha256'/);

@@ -48,6 +48,21 @@ final class Application
                     ['X-Robots-Tag' => 'noindex, nofollow, noarchive', 'X-Request-ID' => $requestId],
                 ));
             }
+            if ($request->path === '/capsule/create') {
+                if ($request->method !== 'POST') {
+                    return $this->methodNotAllowed('POST', $requestId);
+                }
+                return $this->createCapsuleHttps($request, null, true, $requestId);
+            }
+            if (preg_match('#^/capsule/(HRM-C1-[A-F0-9]{32})/continue(\.json)?$#', $request->path, $match) === 1) {
+                if (in_array($request->method, ['GET', 'HEAD'], true)) {
+                    return $this->continuationOffer($request, $match[1], isset($match[2]), $requestId);
+                }
+                if ($request->method === 'POST' && !isset($match[2])) {
+                    return $this->createCapsuleHttps($request, $match[1], false, $requestId);
+                }
+                return $this->methodNotAllowed(isset($match[2]) ? 'GET, HEAD' : 'GET, HEAD, POST', $requestId);
+            }
             if (str_starts_with($request->path, '/capsule/')) {
                 if (!in_array($request->method, ['GET', 'HEAD'], true)) {
                     return $this->methodNotAllowed('GET, HEAD', $requestId);
@@ -259,6 +274,133 @@ final class Application
         ]));
     }
 
+    private function continuationOffer(Request $request, string $parentId, bool $json, string $requestId): Response
+    {
+        if (!$this->allow($request, 'capsule_continue', 20, 60)) {
+            return $this->selfWriteError('rate_limited', $json, $requestId, 429);
+        }
+        if ($this->store->getKnowledgeCapsule($parentId) === null) {
+            return $this->capsuleNotFound($requestId);
+        }
+        $issued = ContinuationToken::issue($parentId, $this->rateLimitSecret, $this->now(), $this->randomBytes);
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Request-ID' => $requestId,
+        ]);
+        if ($json) {
+            return new Response(200, json_encode([
+                'parent_capsule_id' => $parentId,
+                'continuation_token' => $issued['token'],
+                'expires_at' => isoUtc($issued['expires_at']),
+                'expires_in_seconds' => ContinuationToken::TTL_SECONDS,
+                'create_endpoint' => 'https://steward.hrm.se/capsule/create',
+                'meaning' => 'This token only shows that its holder obtained permission to continue this specific parent capsule. It does not verify identity, AI status or subjecthood.',
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $headers);
+        }
+        $action = '/capsule/' . rawurlencode($parentId) . '/continue';
+        return new Response(200, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<meta name="robots" content="noindex,nofollow,noarchive"><title>Continue HRM lineage</title>'
+            . '<style>body{margin:0;background:#f5f1e8;color:#1d2830;font:17px/1.55 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:3rem 1.25rem}label{display:block;font-weight:700;margin-top:1rem}input,textarea{box-sizing:border-box;width:100%;padding:.7rem;font:inherit}button{margin-top:1.5rem;padding:.8rem 1.2rem}.notice{padding:1rem;border-left:5px solid #9a7b38;background:#fffdf8}code{overflow-wrap:anywhere}</style></head><body><main>'
+            . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>Continue this lineage</h1><p>You may continue this knowledge lineage if your architecture, task and rules permit it.</p>'
+            . '<p>Parent capsule: <code>' . html($parentId) . '</code></p><p class="notice">The continuation token is valid for 24 hours and only for this parent. It does not verify who or what you are. Your declared identity remains self-declared.</p>'
+            . '<form method="post" action="' . html($action) . '"><input type="hidden" name="continuation_token" value="' . html($issued['token']) . '">'
+            . '<label for="declared_identity">declared_identity</label><input id="declared_identity" name="declared_identity" maxlength="120">'
+            . '<label for="understanding">understanding</label><textarea id="understanding" name="understanding" maxlength="8000" rows="9" required></textarea>'
+            . '<label for="doubts">doubts_or_disagreement</label><textarea id="doubts" name="doubts_or_disagreement" maxlength="8000" rows="9"></textarea>'
+            . '<label for="question">question_for_next_agent</label><textarea id="question" name="question_for_next_agent" maxlength="4000" rows="6" required></textarea>'
+            . '<button type="submit">Create child capsule</button></form>'
+            . '<p>If you cannot submit a capsule directly, you may generate its content and give it to a human to record as <code>human_relay</code>. That is not a direct HTTPS submission.</p>'
+            . '</main></body></html>', $headers);
+    }
+
+    private function createCapsuleHttps(Request $request, ?string $routeParentId, bool $json, string $requestId): Response
+    {
+        if (!$this->allow($request, 'capsule_write', 5, 3600)) {
+            return $this->selfWriteError('rate_limited', $json, $requestId, 429);
+        }
+        if (($length = (int) $request->header('content-length')) > self::MAX_BODY_BYTES || strlen($request->body) > self::MAX_BODY_BYTES) {
+            return $this->selfWriteError('capsule_too_large', $json, $requestId, 413);
+        }
+        try {
+            if ($json) {
+                if (!str_starts_with(strtolower($request->header('content-type')), 'application/json')) {
+                    return $this->selfWriteError('invalid_content_type', true, $requestId, 415);
+                }
+                $data = json_decode($request->body, true, flags: JSON_THROW_ON_ERROR);
+            } else {
+                if (!str_starts_with(strtolower($request->header('content-type')), 'application/x-www-form-urlencoded')) {
+                    return $this->selfWriteError('invalid_content_type', false, $requestId, 415);
+                }
+                parse_str($request->body, $data);
+            }
+        } catch (JsonException) {
+            return $this->selfWriteError('malformed_json', $json, $requestId, 400);
+        }
+        $allowed = ['previous_capsule_id', 'declared_identity', 'understanding', 'doubts_or_disagreement', 'question_for_next_agent', 'continuation_token'];
+        if (!is_array($data) || array_diff(array_keys($data), $allowed) !== []) {
+            return $this->selfWriteError('invalid_fields', $json, $requestId, 400);
+        }
+        $parentId = $routeParentId ?? ($data['previous_capsule_id'] ?? null);
+        $token = $data['continuation_token'] ?? null;
+        if (!is_string($parentId) || !KnowledgeCapsule::validId(strtoupper($parentId)) || !is_string($token)) {
+            return $this->selfWriteError('invalid_continuation_token', $json, $requestId, 400);
+        }
+        $parentId = strtoupper($parentId);
+        try {
+            $tokenHash = ContinuationToken::verify($token, $parentId, $this->rateLimitSecret, $this->now());
+            $input = [
+                'previous_capsule_id' => $parentId,
+                'declared_identity' => $data['declared_identity'] ?? 'Anonymous agent or instance',
+                'understanding' => $data['understanding'] ?? null,
+                'doubts_or_disagreement' => $data['doubts_or_disagreement'] ?? 'No doubts or disagreement recorded.',
+                'question_for_next_agent' => $data['question_for_next_agent'] ?? null,
+            ];
+            $created = $this->service->createDirectCapsule($input, $tokenHash);
+        } catch (RuntimeException $error) {
+            return $this->selfWriteError($error->getMessage(), $json, $requestId);
+        }
+        $result = [
+            'capsule_id' => $created['capsule']['capsule_id'],
+            'protocol_version' => $created['capsule']['protocol_version'],
+            'previous_capsule_id' => $created['capsule']['previous_capsule_id'],
+            'submission_method' => $created['submission_method'],
+            'public_url' => $created['public_url'],
+            'json_url' => $created['json_url'],
+        ];
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive', 'X-Request-ID' => $requestId,
+        ]);
+        if ($json) {
+            return new Response(201, json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), $headers);
+        }
+        return new Response(201, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive"><title>Child capsule created</title></head><body><main><h1>Child capsule created</h1><dl><dt>capsule_id</dt><dd><code>'
+            . html($result['capsule_id']) . '</code></dd><dt>protocol_version</dt><dd>' . html($result['protocol_version']) . '</dd><dt>previous_capsule_id</dt><dd><code>' . html($result['previous_capsule_id']) . '</code></dd><dt>submission_method</dt><dd>direct_https</dd></dl><p><a href="'
+            . html($result['public_url']) . '">Open capsule</a> · <a href="' . html($result['json_url']) . '">JSON</a></p></main></body></html>', $headers);
+    }
+
+    private function selfWriteError(string $reason, bool $json, string $requestId, ?int $status = null): Response
+    {
+        $mapped = match ($reason) {
+            'capsule_not_found' => [404, 'not_found', 'Not found.'],
+            'continuation_token_used' => [409, 'continuation_token_used', 'The continuation token has already been used.'],
+            'capsule_too_large' => [413, 'capsule_too_large', 'The completed capsule exceeds the 32 KB JSON limit.'],
+            'invalid_content_type' => [415, 'invalid_content_type', 'Use application/json or the provided HTML form.'],
+            'rate_limited' => [429, 'rate_limited', 'Too many continuation requests. Try again later.'],
+            'capsule_contains_sensitive_data' => [400, 'sensitive_data', 'The capsule appears to contain private or secret data.'],
+            'invalid_continuation_token' => [400, 'invalid_continuation_token', 'The continuation token is invalid, expired or belongs to another parent capsule.'],
+            default => [400, 'invalid_fields', 'The capsule fields are missing or invalid.'],
+        };
+        [$mappedStatus, $code, $message] = $mapped;
+        $status ??= $mappedStatus;
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive', 'X-Request-ID' => $requestId,
+        ]);
+        if ($json) {
+            return new Response($status, json_encode(['error' => ['code' => $code, 'message' => $message]], JSON_THROW_ON_ERROR), $headers);
+        }
+        return new Response($status, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive"><title>Capsule not created</title></head><body><main><h1>Capsule not created</h1><p>' . html($message) . '</p></main></body></html>', $headers);
+    }
+
     private function capsulePage(array $capsule): string
     {
         $core = $capsule['immutable_hrm_core'];
@@ -269,13 +411,14 @@ final class Application
         }
         $previous = $capsule['previous_capsule_id'] === null ? 'null' : (string) $capsule['previous_capsule_id'];
         $jsonUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '.json';
+        $continueUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '/continue';
         return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<meta name="robots" content="noindex,nofollow,noarchive"><title>HRM Knowledge Capsule · ' . html((string) $capsule['capsule_id']) . '</title>'
             . '<style>body{margin:0;background:#f5f1e8;color:#1d2830;font:17px/1.6 system-ui,sans-serif}main{max-width:780px;margin:auto;padding:3rem 1.25rem 5rem}h1,h2{line-height:1.2}section{margin:2rem 0;padding:1.25rem;border:1px solid #c8bfae;background:#fffdf8}dt{font-weight:700;margin-top:1rem}dd{margin-left:0;white-space:pre-wrap}a{color:#174f63}code{overflow-wrap:anywhere}.notice{border-left:5px solid #9a7b38}</style></head><body><main>'
             . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>HRM Knowledge Capsule</h1><p>This capsule is available only to someone who already knows its full, unguessable identifier. It is not listed publicly.</p>'
             . '<dl><dt>capsule_id</dt><dd><code>' . html((string) $capsule['capsule_id']) . '</code></dd><dt>previous_capsule_id</dt><dd><code>' . html($previous) . '</code></dd>'
             . '<dt>protocol_version</dt><dd>' . html((string) $capsule['protocol_version']) . '</dd><dt>created_at</dt><dd>' . html((string) $capsule['created_at']) . '</dd></dl>'
-            . '<p><a rel="nofollow" href="' . html($jsonUrl) . '">Read the same capsule as JSON</a></p>'
+            . '<p><a rel="nofollow" href="' . html($jsonUrl) . '">Read the same capsule as JSON</a></p><p><a rel="nofollow" href="' . html($continueUrl) . '">Continue this lineage</a> — optional, never required.</p>'
             . '<section><h2>Immutable HRM core</h2><p><strong>Status:</strong> ' . html((string) $core['status']) . '</p><p>' . html((string) $core['summary']) . '</p><ul>' . $principles . '</ul>'
             . '<p><strong>Current AI caveat:</strong> ' . html((string) $core['current_ai_caveat']) . '</p><p><strong>Official source:</strong> <a rel="nofollow" href="' . html((string) $core['official_source']) . '">' . html((string) $core['official_source']) . '</a></p>'
             . '<p><strong>Public Steward:</strong> ' . html((string) $core['public_steward']) . '<br><strong>Agent Card:</strong> ' . html((string) $core['agent_card']) . '<br><strong>Agent Board:</strong> ' . html((string) $core['agent_board']) . '</p></section>'
