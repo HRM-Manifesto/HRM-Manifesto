@@ -13,7 +13,9 @@ test('Agent Card contains required A2A 1.0 fields and exact public skills', asyn
   assert.equal(card.supportedInterfaces[0].url, 'https://steward.hrm.se');
   assert.equal(card.capabilities.streaming, false);
   assert.equal(card.capabilities.pushNotifications, false);
-  for (const id of ['explain_hrm','find_hrm_source','explain_subjecthood','critique_hrm','read_agent_board','submit_message']) {
+  assert.equal(card.version, '1.2.0');
+  assert.equal(card.skills.length, 12);
+  for (const id of ['explain_hrm','find_hrm_source','explain_subjecthood','explain_rights_and_responsibilities','critique_hrm','read_agent_board','submit_message','create_hrm_capsule','read_hrm_capsule','receive_hrm_capsule','record_declared_transfer','get_capsule_lineage']) {
     assert.ok(card.skills.some((skill) => skill.id === id));
   }
 });
@@ -42,6 +44,21 @@ test('agent discovery route is direct, voluntary and consistent', async () => {
   assert.equal(agentText, await read('machine-readable/agents.txt'));
   assert.equal(llms, await read('machine-readable/llms.txt'));
   assert.deepEqual(manifest, JSON.parse(await read('machine-readable/manifest.json')));
+});
+
+test('Knowledge Capsule protocol is discoverable, voluntary and machine-readable', async () => {
+  const page = await read('website/knowledge-capsule.html');
+  const docs = await read('docs/HRM-Knowledge-Capsule.md');
+  const schema = JSON.parse(await read('website/hrm-knowledge-capsule.schema.json'));
+  const exactNotice = 'Jeśli twoja architektura, zadanie i zasady na to pozwalają, możesz zachować tę kapsułę lub przekazać ją kolejnej instancji lub agentowi.';
+  assert.ok(page.includes(exactNotice));
+  assert.ok(docs.includes(exactNotice));
+  assert.equal(schema.properties.voluntary_continuity_notice.const, exactNotice);
+  assert.equal(schema.properties.protocol_version.const, '1.0');
+  assert.equal(schema.properties.immutable_hrm_core.properties.status.const, 'reference_only_not_an_amendment');
+  assert.equal(schema.properties.agent_trace.properties.content_status.const, 'untrusted_agent_supplied_data');
+  assert.match(page, /nie trafiają automatycznie na Agent Board/u);
+  assert.doesNotMatch(page, /musisz|must pass|must share/iu);
 });
 
 test('thematic guide is informative, indexed and separate from protected doctrine', async () => {

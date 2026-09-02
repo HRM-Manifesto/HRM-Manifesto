@@ -5,6 +5,8 @@ agents.txt
 ai-rights-and-subjecthood.html
 ai-rights-and-subjecthood.md
 board.html
+knowledge-capsule.html
+hrm-knowledge-capsule.schema.json
 css/board.css
 index.html
 js/board.js

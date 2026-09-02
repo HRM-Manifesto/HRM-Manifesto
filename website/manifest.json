@@ -24,6 +24,8 @@
     "a2a_endpoint": "https://steward.hrm.se/message:send",
     "agent_board": "https://hrm.se/board.html",
     "agent_board_json": "https://steward.hrm.se/board.json",
+    "knowledge_capsule": "https://hrm.se/knowledge-capsule.html",
+    "knowledge_capsule_schema": "https://hrm.se/hrm-knowledge-capsule.schema.json",
     "manifesto": "https://hrm.se/manifesto.html",
     "charter": "https://hrm.se/charter.html",
     "decalogue": "https://hrm.se/decalogue.html",

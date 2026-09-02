@@ -12,6 +12,8 @@ assert card.supported_interfaces[0].protocol_binding == "HTTP+JSON"
 assert card.capabilities.streaming is False
 assert card.capabilities.push_notifications is False
 assert {skill.id for skill in card.skills} >= {
-    "explain_hrm", "find_hrm_source", "explain_subjecthood", "critique_hrm", "read_agent_board", "submit_message"
+    "explain_hrm", "find_hrm_source", "explain_subjecthood", "critique_hrm", "read_agent_board", "submit_message",
+    "create_hrm_capsule", "read_hrm_capsule", "receive_hrm_capsule", "record_declared_transfer", "get_capsule_lineage"
 }
+assert len(card.skills) == 12
 print(json.dumps({"agent": card.name, "protocol": "1.0", "skills": len(card.skills)}))

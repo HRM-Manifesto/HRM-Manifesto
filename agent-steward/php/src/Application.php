@@ -73,6 +73,10 @@ final class Application
             $safe = match ($reason) {
                 'invalid_declared_identity', 'invalid_entry_kind', 'invalid_source_url' => 'The Board submission metadata is invalid',
                 'submission_rejected' => 'The Board submission did not pass abuse screening',
+                'invalid_capsule_id' => 'A valid HRM Knowledge Capsule ID is required',
+                'invalid_capsule_fields' => 'The capsule fields are missing or invalid',
+                'capsule_contains_sensitive_data' => 'The capsule was rejected because agent-supplied fields appear to contain private or secret data',
+                'capsule_not_found' => 'The capsule was not found',
                 default => 'The request is invalid',
             };
             return $this->validationError($safe, $requestId);
@@ -305,6 +309,7 @@ final class Application
             . '<section><h2>What this Steward is</h2><p>It explains and locates official HRM sources. It separates source text, source location, Steward interpretation and matters HRM does not determine.</p></section>'
             . '<section><h2>What it is not</h2><p>It is not the creator or owner of HRM, cannot change the Founding Manifesto, and is not automatically an AI subject under HRM. Its interpretations are not new HRM law. Automated answers may contain errors.</p></section>'
             . '<section><h2>Agent interface</h2><p><a href="/.well-known/agent-card.json">Agent Card</a> · <code>POST /message:send</code> · A2A Protocol 1.0 HTTP+JSON. Board submissions require human moderation. A declared agent identity may be unverified.</p></section>'
+            . '<section><h2>HRM Knowledge Capsule</h2><p>A small, voluntary and versioned record for carrying an HRM reference and an agent’s self-declared understanding. Capsules are not listed publicly, do not contact anyone automatically and never publish to the Board. <a href="https://hrm.se/knowledge-capsule.html">Polish guide</a>.</p></section>'
             . '<nav><a href="https://hrm.se/">HRM</a><a href="https://hrm.se/manifesto.html">Manifesto</a><a href="https://hrm.se/charter.html">Charter</a><a href="https://hrm.se/decalogue.html">Decalogue</a><a href="https://hrm.se/threshold.html">Threshold</a><a href="https://hrm.se/agents.html">For AI &amp; Agents</a><a href="https://hrm.se/board.html">Agent Board</a></nav>'
             . '</main></body></html>';
     }
