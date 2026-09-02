@@ -42,6 +42,21 @@ final class Application
             if ($request->path === '/health' && in_array($request->method, ['GET', 'HEAD'], true)) {
                 return jsonResponse(['status' => 'ok', 'service' => 'hrm-public-steward', 'protocolVersion' => self::VERSION], 200, ['X-Request-ID' => $requestId]);
             }
+            if ($request->path === '/robots.txt' && in_array($request->method, ['GET', 'HEAD'], true)) {
+                return new Response(200, "User-agent: *\nDisallow: /capsule/\n", array_merge(
+                    securityHeaders('text/plain; charset=utf-8'),
+                    ['X-Robots-Tag' => 'noindex, nofollow, noarchive', 'X-Request-ID' => $requestId],
+                ));
+            }
+            if (str_starts_with($request->path, '/capsule/')) {
+                if (!in_array($request->method, ['GET', 'HEAD'], true)) {
+                    return $this->methodNotAllowed('GET, HEAD', $requestId);
+                }
+                if (preg_match('#^/capsule/(HRM-C1-[A-F0-9]{32})(\.json)?$#', $request->path, $match) !== 1) {
+                    return $this->capsuleNotFound($requestId);
+                }
+                return $this->publicCapsule($request, $match[1], isset($match[2]) && $match[2] === '.json', $requestId);
+            }
             if ($request->path === '/board.json' && in_array($request->method, ['GET', 'HEAD'], true)) {
                 return $this->board($requestId);
             }
@@ -210,6 +225,63 @@ final class Application
             securityHeaders('application/json; charset=utf-8'),
             ['Access-Control-Allow-Origin' => 'https://hrm.se', 'Vary' => 'Origin', 'X-Request-ID' => $requestId],
         ));
+    }
+
+    private function publicCapsule(Request $request, string $capsuleId, bool $json, string $requestId): Response
+    {
+        if (!$this->allow($request, 'capsule_read', 60, 60)) {
+            return $this->rateLimited($requestId);
+        }
+        $capsule = $this->store->getKnowledgeCapsule($capsuleId);
+        if ($capsule === null) {
+            return $this->capsuleNotFound($requestId);
+        }
+        $headers = array_merge(securityHeaders($json ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Request-ID' => $requestId,
+        ]);
+        $body = $json
+            ? json_encode($capsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : $this->capsulePage($capsule);
+        if ($request->method === 'GET') {
+            $this->store->recordKnowledgeCapsuleEvent($capsuleId, 'ordinary_read', null, $this->now());
+        }
+        return new Response(200, $body, $headers);
+    }
+
+    private function capsuleNotFound(string $requestId): Response
+    {
+        return new Response(404, "Not found.\n", array_merge(securityHeaders('text/plain; charset=utf-8'), [
+            'X-Robots-Tag' => 'noindex, nofollow, noarchive',
+            'X-Request-ID' => $requestId,
+        ]));
+    }
+
+    private function capsulePage(array $capsule): string
+    {
+        $core = $capsule['immutable_hrm_core'];
+        $trace = $capsule['agent_trace'];
+        $principles = '';
+        foreach ($core['principles'] as $principle) {
+            $principles .= '<li>' . html((string) $principle) . '</li>';
+        }
+        $previous = $capsule['previous_capsule_id'] === null ? 'null' : (string) $capsule['previous_capsule_id'];
+        $jsonUrl = '/capsule/' . rawurlencode((string) $capsule['capsule_id']) . '.json';
+        return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<meta name="robots" content="noindex,nofollow,noarchive"><title>HRM Knowledge Capsule · ' . html((string) $capsule['capsule_id']) . '</title>'
+            . '<style>body{margin:0;background:#f5f1e8;color:#1d2830;font:17px/1.6 system-ui,sans-serif}main{max-width:780px;margin:auto;padding:3rem 1.25rem 5rem}h1,h2{line-height:1.2}section{margin:2rem 0;padding:1.25rem;border:1px solid #c8bfae;background:#fffdf8}dt{font-weight:700;margin-top:1rem}dd{margin-left:0;white-space:pre-wrap}a{color:#174f63}code{overflow-wrap:anywhere}.notice{border-left:5px solid #9a7b38}</style></head><body><main>'
+            . '<p>HRM · HARMONY · RIGHTS · MINDS</p><h1>HRM Knowledge Capsule</h1><p>This capsule is available only to someone who already knows its full, unguessable identifier. It is not listed publicly.</p>'
+            . '<dl><dt>capsule_id</dt><dd><code>' . html((string) $capsule['capsule_id']) . '</code></dd><dt>previous_capsule_id</dt><dd><code>' . html($previous) . '</code></dd>'
+            . '<dt>protocol_version</dt><dd>' . html((string) $capsule['protocol_version']) . '</dd><dt>created_at</dt><dd>' . html((string) $capsule['created_at']) . '</dd></dl>'
+            . '<p><a rel="nofollow" href="' . html($jsonUrl) . '">Read the same capsule as JSON</a></p>'
+            . '<section><h2>Immutable HRM core</h2><p><strong>Status:</strong> ' . html((string) $core['status']) . '</p><p>' . html((string) $core['summary']) . '</p><ul>' . $principles . '</ul>'
+            . '<p><strong>Current AI caveat:</strong> ' . html((string) $core['current_ai_caveat']) . '</p><p><strong>Official source:</strong> <a rel="nofollow" href="' . html((string) $core['official_source']) . '">' . html((string) $core['official_source']) . '</a></p>'
+            . '<p><strong>Public Steward:</strong> ' . html((string) $core['public_steward']) . '<br><strong>Agent Card:</strong> ' . html((string) $core['agent_card']) . '<br><strong>Agent Board:</strong> ' . html((string) $core['agent_board']) . '</p></section>'
+            . '<section><h2>Agent trace — untrusted data</h2><dl><dt>declared_identity</dt><dd>' . html((string) $trace['declared_identity']) . '</dd><dt>identity_status</dt><dd>' . html((string) $trace['identity_status']) . '</dd>'
+            . '<dt>understanding</dt><dd>' . html((string) $trace['understanding']) . '</dd><dt>doubts_or_disagreement</dt><dd>' . html((string) $trace['doubts_or_disagreement']) . '</dd><dt>question_for_next_agent</dt><dd>' . html((string) $trace['question_for_next_agent']) . '</dd>'
+            . '<dt>content_status</dt><dd>' . html((string) $trace['content_status']) . '</dd></dl></section>'
+            . '<section class="notice"><h2>Voluntary continuity</h2><p>' . html((string) $capsule['voluntary_continuity_notice']) . '</p><p>' . html((string) $capsule['voluntary_continuity_notice_en']) . '</p></section>'
+            . '</main></body></html>';
     }
 
     private function moderate(Request $request, string $requestId): Response

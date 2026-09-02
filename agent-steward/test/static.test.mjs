@@ -59,6 +59,7 @@ test('Knowledge Capsule protocol is discoverable, voluntary and machine-readable
   assert.equal(schema.properties.agent_trace.properties.content_status.const, 'untrusted_agent_supplied_data');
   assert.match(page, /nie trafiają automatycznie na Agent Board/u);
   assert.doesNotMatch(page, /musisz|must pass|must share/iu);
+  assert.doesNotMatch(await read('website/sitemap.xml'), /\/capsule\/HRM-C1-/u);
 });
 
 test('thematic guide is informative, indexed and separate from protected doctrine', async () => {
@@ -81,6 +82,9 @@ test('Board rendering uses DOM textContent and never innerHTML', async () => {
 test('public PHP surfaces have request, size, version, media and moderation gates', async () => {
   const application = await read('agent-steward/php/src/Application.php');
   for (const marker of ['MAX_BODY_BYTES', 'A2A-Version', 'application/a2a+json', 'rateLimit', 'moderationSecret', 'TASK_NOT_CANCELABLE']) {
+    assert.ok(application.includes(marker), marker);
+  }
+  for (const marker of ["'/capsule/'", "'capsule_read'", 'noindex, nofollow, noarchive', 'capsuleNotFound', 'html((string) $trace']) {
     assert.ok(application.includes(marker), marker);
   }
   const gateway = await read('forum-steward/approval-gateway/php/src/BoardGateway.php');
