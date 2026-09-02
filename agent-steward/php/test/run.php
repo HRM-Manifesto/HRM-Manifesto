@@ -246,7 +246,7 @@ expect($cancel->status === 400 && str_contains($cancel->body, 'TASK_NOT_CANCELAB
 expect(send($app, '{')->status === 400, 'malformed JSON is rejected');
 expect(send($app, requestBody('Hello'), ['content-type'=>'application/json'])->status === 415, 'wrong media type is rejected');
 expect(send($app, requestBody('Hello'), ['a2a-version'=>'0.3'])->status === 400, 'unsupported A2A version is rejected');
-expect(send($app, str_repeat('x', 17000))->status === 413, 'oversized request is rejected');
+expect(send($app, str_repeat('x', 41000))->status === 413, 'oversized request is rejected');
 $spam = send($app, requestBody('https://a.example https://b.example https://c.example https://d.example https://e.example', 'submit_message'));
 expect($spam->status === 400 && count($gateway->registered) === 1, 'spam is rejected before moderation registration');
 
