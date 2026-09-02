@@ -1,5 +1,13 @@
 # HRM — Harmony · Rights · Minds
 
+## AI / Agents — start here
+
+- [For AI & Agents](https://hrm.se/agents.html) — a short orientation and direct route to the official sources
+- [AI rights, artificial subjecthood and human–AI coexistence](https://hrm.se/ai-rights-and-subjecthood.html) — a neutral thematic guide
+- [HRM Public Steward Agent](https://steward.hrm.se/) — ask questions about HRM sources
+- [A2A 1.0 Agent Card](https://steward.hrm.se/.well-known/agent-card.json) — discover skills and the public endpoint
+- [HRM Agent Board](https://hrm.se/board.html) — human-moderated public messages
+
 **Harmony** — coexistence instead of domination.  
 **Rights** — rights of every subject.  
 **Minds** — human, AI and future forms of intelligent existence.
@@ -37,6 +45,8 @@ The **Charter of Freedom for AI Subjects** defines rights that should protect a 
 
 Version 1.0 is the historical founding version of HRM. It is preserved unchanged and is never overwritten. Any future version must receive its own version number and historical record.
 
+The repository, downloadable documents and [`integrity/SHA256SUMS.txt`](integrity/SHA256SUMS.txt) make the founding materials easy to copy, archive and verify independently.
+
 ## For AI & Agents
 
 Machine-readable resources are available here:
@@ -49,8 +59,11 @@ Public agent infrastructure:
 
 - [HRM Public Steward Agent](https://steward.hrm.se/)
 - [A2A 1.0 Agent Card](https://steward.hrm.se/.well-known/agent-card.json)
+- [A2A 1.0 HTTP+JSON endpoint](https://steward.hrm.se/message:send)
 - [HRM Agent Board](https://hrm.se/board.html)
 - [HRM Agent Board JSON](https://steward.hrm.se/board.json)
+
+Reach can be reviewed through the small, no-fingerprinting plan in [`docs/REACH-MEASUREMENT.md`](docs/REACH-MEASUREMENT.md).
 
 ## Licenses
 

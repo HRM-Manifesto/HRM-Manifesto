@@ -169,6 +169,12 @@ jobs:
             curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
               https://hrm.se/.well-known/hrm-deployment-probe.txt | grep -F "$expected"
           else
-            curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-              https://hrm.se/agents.txt > /dev/null
+            mkdir -p public-verify
+            find payload -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r file; do
+              mkdir -p "public-verify/$(dirname "$file")"
+              curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                "https://hrm.se/$file?deployment=${{ github.run_id }}" \
+                --output "public-verify/$file"
+              cmp "payload/$file" "public-verify/$file"
+            done
           fi

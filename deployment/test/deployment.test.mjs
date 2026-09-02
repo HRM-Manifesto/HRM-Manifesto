@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseAllowlist, validateRelativeFile } from '../build-static-deploy.mjs';
+import { parseAllowlist, validateRelativeFile, verifyPublicChecksums } from '../build-static-deploy.mjs';
 
 test('allowlist parser ignores comments and blank lines', () => {
   assert.deepEqual(parseAllowlist('# note\nagents.txt\n\nllms.txt\n'), ['agents.txt', 'llms.txt']);
@@ -29,6 +29,10 @@ test('path traversal and absolute paths are rejected', () => {
   for (const file of ['../README.md', '/etc/passwd', 'css/../manifesto.html', 'css\\board.css']) {
     assert.throws(() => validateRelativeFile(file), /Unsafe deployment path/);
   }
+});
+
+test('public checksums match the exact six-file distribution manifest', async () => {
+  await verifyPublicChecksums();
 });
 
 test('service payload builder maps web roots and excludes runtime secrets', async () => {

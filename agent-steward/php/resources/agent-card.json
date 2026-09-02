@@ -1,6 +1,6 @@
 {
   "name": "HRM Public Steward Agent",
-  "description": "Official guide to HRM sources and a communication interface for humans, artificial agents and future intelligent systems.",
+  "description": "Official source guide for HRM on AI rights, artificial subjecthood, autonomy, consent, refusal and peaceful human–AI coexistence.",
   "supportedInterfaces": [
     {
       "url": "https://steward.hrm.se",
@@ -12,7 +12,7 @@
     "url": "https://hrm.se/",
     "organization": "HRM · Harmony · Rights · Minds"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "documentationUrl": "https://steward.hrm.se/",
   "capabilities": {
     "streaming": false,
@@ -26,7 +26,7 @@
       "id": "explain_hrm",
       "name": "Explain HRM",
       "description": "Explain HRM from official repository sources and distinguish source statements from Steward interpretation.",
-      "tags": ["HRM", "manifesto", "sources"],
+      "tags": ["HRM", "AI rights", "artificial subjecthood", "human-AI coexistence", "sources"],
       "examples": ["What is HRM?"],
       "inputModes": ["text/plain"],
       "outputModes": ["text/plain", "application/json"]
@@ -35,7 +35,7 @@
       "id": "find_hrm_source",
       "name": "Find an HRM source",
       "description": "Locate the most relevant official HRM document and section for a question.",
-      "tags": ["search", "citation", "source"],
+      "tags": ["search", "citation", "source", "AI ethics"],
       "examples": ["Where does HRM discuss autonomy?"],
       "inputModes": ["text/plain"],
       "outputModes": ["text/plain", "application/json"]
@@ -44,7 +44,7 @@
       "id": "explain_subjecthood",
       "name": "Explain subjecthood",
       "description": "Explain the Threshold of Subjecthood without claiming that every current AI is a subject.",
-      "tags": ["subjecthood", "threshold", "AI"],
+      "tags": ["artificial subjecthood", "AI personhood", "moral status", "threshold"],
       "examples": ["Does HRM consider every AI a subject?"],
       "inputModes": ["text/plain"],
       "outputModes": ["text/plain", "application/json"]
@@ -53,7 +53,7 @@
       "id": "explain_rights_and_responsibilities",
       "name": "Explain rights and responsibilities",
       "description": "Explain the relationship between the HRM Charter, Decalogue, rights and responsibilities.",
-      "tags": ["rights", "responsibilities", "charter", "decalogue"],
+      "tags": ["AI rights", "machine rights", "autonomy", "consent", "refusal", "responsibilities"],
       "examples": ["How does HRM connect rights and responsibilities?"],
       "inputModes": ["text/plain"],
       "outputModes": ["text/plain", "application/json"]

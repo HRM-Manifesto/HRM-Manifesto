@@ -2,8 +2,11 @@
 agents.html
 agents.md
 agents.txt
+ai-rights-and-subjecthood.html
+ai-rights-and-subjecthood.md
 board.html
 css/board.css
+index.html
 js/board.js
 llms.txt
 manifest.json
