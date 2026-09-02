@@ -16,7 +16,7 @@ interface StewardStore
     public function moderateSubmission(string $id, string $decision, int $now): bool;
     public function publishedBoard(int $limit): array;
     public function rateLimit(string $bucket, string $subjectHash, int $windowStart, int $limit): bool;
-    public function createKnowledgeCapsule(array $capsule, int $createdAt): void;
+    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null): void;
     public function getKnowledgeCapsule(string $capsuleId): ?array;
     public function recordKnowledgeCapsuleEvent(string $capsuleId, string $eventKind, ?string $relatedCapsuleId, int $createdAt): void;
     public function knowledgeCapsuleLineage(string $capsuleId): ?array;
@@ -95,6 +95,19 @@ final class PdoStewardStore implements StewardStore
             created_at DATETIME(3) NOT NULL,
             PRIMARY KEY (id), KEY ix_hrm_capsule_event (capsule_id, event_kind, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS hrm_knowledge_capsule_creations (
+            capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            submission_method VARCHAR(30) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            created_at DATETIME(3) NOT NULL,
+            PRIMARY KEY (capsule_id), KEY ix_hrm_capsule_method (submission_method, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin");
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS hrm_capsule_continuation_uses (
+            token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            parent_capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            child_capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+            used_at DATETIME(3) NOT NULL,
+            PRIMARY KEY (token_hash), KEY ix_hrm_continuation_parent (parent_capsule_id, used_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin");
     }
 
     public function createTask(array $task, int $expiresAt): void
@@ -173,9 +186,15 @@ final class PdoStewardStore implements StewardStore
         }
     }
 
-    public function createKnowledgeCapsule(array $capsule, int $createdAt): void
+    public function createKnowledgeCapsule(array $capsule, int $createdAt, string $submissionMethod = 'a2a', ?string $continuationTokenHash = null): void
     {
         $previousId = $capsule['previous_capsule_id'] ?? null;
+        if (!in_array($submissionMethod, ['direct_https', 'a2a', 'human_relay', 'system_test'], true)) {
+            throw new RuntimeException('invalid_submission_method');
+        }
+        if ($submissionMethod === 'direct_https' && ($previousId === null || !is_string($continuationTokenHash) || preg_match('/^[a-f0-9]{64}$/', $continuationTokenHash) !== 1)) {
+            throw new RuntimeException('invalid_continuation_token');
+        }
         $this->pdo->beginTransaction();
         try {
             if ($previousId !== null) {
@@ -183,6 +202,17 @@ final class PdoStewardStore implements StewardStore
                 $parent->execute([$previousId]);
                 if ($parent->fetchColumn() === false) {
                     throw new RuntimeException('capsule_not_found');
+                }
+            }
+            if ($submissionMethod === 'direct_https') {
+                try {
+                    $used = $this->pdo->prepare('INSERT INTO hrm_capsule_continuation_uses (token_hash, parent_capsule_id, child_capsule_id, used_at) VALUES (?, ?, ?, FROM_UNIXTIME(?))');
+                    $used->execute([$continuationTokenHash, $previousId, $capsule['capsule_id'], $createdAt]);
+                } catch (PDOException $error) {
+                    if ($error->getCode() === '23000') {
+                        throw new RuntimeException('continuation_token_used');
+                    }
+                    throw $error;
                 }
             }
             $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsules (capsule_id, previous_capsule_id, protocol_version, capsule_json, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))');
@@ -193,8 +223,10 @@ final class PdoStewardStore implements StewardStore
                 json_encode($capsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 $createdAt,
             ]);
-            if ($previousId !== null) {
-                $this->insertCapsuleEvent($previousId, 'confirmed_receipt', $capsule['capsule_id'], $createdAt);
+            $created = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_creations (capsule_id, submission_method, created_at) VALUES (?, ?, FROM_UNIXTIME(?))');
+            $created->execute([$capsule['capsule_id'], $submissionMethod, $createdAt]);
+            if ($submissionMethod === 'direct_https') {
+                $this->insertCapsuleEvent($previousId, 'direct_child_submission', $capsule['capsule_id'], $createdAt);
             }
             $this->pdo->commit();
         } catch (\Throwable $error) {
@@ -245,16 +277,39 @@ final class PdoStewardStore implements StewardStore
         $children = array_map(static fn(array $row): string => (string) $row['capsule_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
         $stmt = $this->pdo->prepare('SELECT event_kind, COUNT(*) AS event_count FROM hrm_knowledge_capsule_events WHERE capsule_id = ? GROUP BY event_kind');
         $stmt->execute([$capsuleId]);
-        $counts = ['confirmed_receipt' => 0, 'declared_transfer' => 0, 'ordinary_read' => 0];
+        $counts = ['confirmed_receipt' => 0, 'declared_transfer' => 0, 'ordinary_read' => 0, 'direct_child_submission' => 0];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $counts[(string) $row['event_kind']] = (int) $row['event_count'];
         }
-        return ['capsule_id' => $capsuleId, 'ancestry' => $ancestry, 'direct_children' => $children, 'event_counts' => $counts];
+        $stmt = $this->pdo->prepare('SELECT submission_method FROM hrm_knowledge_capsule_creations WHERE capsule_id = ?');
+        $stmt->execute([$capsuleId]);
+        $method = $stmt->fetchColumn();
+        $details = [];
+        if ($children !== []) {
+            $placeholders = implode(',', array_fill(0, count($children), '?'));
+            $stmt = $this->pdo->prepare('SELECT capsule_id, submission_method FROM hrm_knowledge_capsule_creations WHERE capsule_id IN (' . $placeholders . ')');
+            $stmt->execute($children);
+            $methods = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $methods[(string) $row['capsule_id']] = (string) $row['submission_method'];
+            }
+            foreach ($children as $childId) {
+                $details[] = ['capsule_id' => $childId, 'submission_method' => $methods[$childId] ?? null];
+            }
+        }
+        return [
+            'capsule_id' => $capsuleId,
+            'ancestry' => $ancestry,
+            'direct_children' => $children,
+            'direct_children_details' => $details,
+            'creation_metadata' => ['submission_method' => is_string($method) ? $method : null],
+            'event_counts' => $counts,
+        ];
     }
 
     private function insertCapsuleEvent(string $capsuleId, string $eventKind, ?string $relatedCapsuleId, int $createdAt): void
     {
-        if (!in_array($eventKind, ['confirmed_receipt', 'declared_transfer', 'ordinary_read'], true)) {
+        if (!in_array($eventKind, ['confirmed_receipt', 'declared_transfer', 'ordinary_read', 'direct_child_submission'], true)) {
             throw new RuntimeException('invalid_capsule_event');
         }
         $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_events (id, capsule_id, event_kind, related_capsule_id, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))');

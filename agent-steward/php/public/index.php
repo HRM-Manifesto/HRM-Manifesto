@@ -13,7 +13,7 @@ ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
 $root = dirname(__DIR__);
-foreach (['Http.php', 'Store.php', 'Sources.php', 'GatewayClient.php', 'KnowledgeCapsule.php', 'StewardService.php', 'Application.php'] as $source) {
+foreach (['Http.php', 'Store.php', 'Sources.php', 'GatewayClient.php', 'KnowledgeCapsule.php', 'ContinuationToken.php', 'StewardService.php', 'Application.php'] as $source) {
     require_once $root . '/src/' . $source;
 }
 
