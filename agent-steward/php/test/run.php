@@ -172,6 +172,7 @@ $publicHtml = $app->handle(new Request('GET', '/capsule/' . $capsuleAId, [], '',
 $afterPublicHtml = $store->knowledgeCapsuleLineage($capsuleAId);
 $publicHtmlEvent = $store->capsuleEvents[array_key_last($store->capsuleEvents)];
 expect($publicHtml->status === 200 && str_contains($publicHtml->body, $capsuleAId) && str_contains($publicHtml->body, '/capsule/' . $capsuleAId . '.json'), 'ordinary HTTPS GET returns the capsule and its JSON route without A2A');
+expect(str_contains($publicHtml->body, 'This is the root of this lineage.') && str_contains($publicHtml->body, 'Read full lineage') && strpos($publicHtml->body, 'This is the root of this lineage.') < strpos($publicHtml->body, 'Agent trace — untrusted data'), 'root capsule identifies itself without implying earlier ancestors and shows lineage guidance before the agent trace');
 expect(($publicHtml->headers['X-Robots-Tag'] ?? '') === 'noindex, nofollow, noarchive' && str_contains($publicHtml->body, 'name="robots" content="noindex,nofollow,noarchive"'), 'public capsule HTML is explicitly excluded from indexing and archiving');
 expect($afterPublicHtml['event_counts']['ordinary_read'] === 1 && $afterPublicHtml['event_counts']['confirmed_receipt'] === 0 && $afterPublicHtml['event_counts']['declared_transfer'] === 0, 'HTML GET increments only ordinary_read');
 expect($publicHtmlEvent['read_method'] === 'capsule_html' && preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/', $publicHtmlEvent['read_batch_id']) === 1, 'HTML GET records capsule_html and a random UUIDv4 read batch ID');
@@ -183,10 +184,12 @@ expect($publicHead->status === 200 && $afterPublicHead['event_counts']['ordinary
 $publicJson = $app->handle(new Request('GET', '/capsule/' . $capsuleAId . '.json', [], '', [], '203.0.113.8'));
 $jsonCapsule = json_decode($publicJson->body, true, flags: JSON_THROW_ON_ERROR);
 $lineageUrl = $jsonCapsule['lineage_url'] ?? null;
-unset($jsonCapsule['lineage_url']);
+$lineageGuidance = $jsonCapsule['lineage_guidance'] ?? null;
+unset($jsonCapsule['lineage_url'], $jsonCapsule['lineage_guidance']);
 $afterPublicJson = $store->knowledgeCapsuleLineage($capsuleAId);
 $publicJsonEvent = $store->capsuleEvents[array_key_last($store->capsuleEvents)];
-expect($publicJson->status === 200 && ($publicJson->headers['Content-Type'] ?? '') === 'application/json; charset=utf-8' && $jsonCapsule === $capsuleA && $lineageUrl === 'https://steward.hrm.se/capsule/' . $capsuleAId . '/lineage.json', 'JSON GET preserves the capsule and adds only its full-lineage URL');
+expect($publicJson->status === 200 && ($publicJson->headers['Content-Type'] ?? '') === 'application/json; charset=utf-8' && $jsonCapsule === $capsuleA && $lineageUrl === 'https://steward.hrm.se/capsule/' . $capsuleAId . '/lineage.json', 'JSON GET preserves the capsule and adds its full-lineage URL');
+expect($lineageGuidance === 'Before interpreting or continuing this capsule, read the full lineage. It contains the direct ancestor chain and the understandings, doubts, disagreements and questions left by previous agents.', 'single-capsule JSON gives explicit full-lineage guidance without changing capsule content');
 expect($afterPublicJson['event_counts']['ordinary_read'] === 2 && $afterPublicJson['event_counts']['confirmed_receipt'] === 0, 'JSON GET increments only ordinary_read');
 expect($publicJsonEvent['read_method'] === 'capsule_json' && $publicJsonEvent['read_batch_id'] !== $publicHtmlEvent['read_batch_id'], 'JSON GET records capsule_json with a new batch ID');
 
@@ -220,6 +223,7 @@ expect($capsuleBResult['data']['capsule']['immutable_hrm_core'] === $capsuleA['i
 $publicBHtml = $app->handle(new Request('GET', '/capsule/' . $capsuleBId, [], '', [], '203.0.113.8'));
 $publicBJson = $app->handle(new Request('GET', '/capsule/' . $capsuleBId . '.json', [], '', [], '203.0.113.8'));
 expect($publicBHtml->status === 200 && str_contains($publicBHtml->body, '>1.1<') && json_decode($publicBJson->body, true, flags: JSON_THROW_ON_ERROR)['protocol_version'] === '1.1', 'public HTML and JSON reads work for protocol 1.1');
+expect(str_contains($publicBHtml->body, 'This capsule is part of a lineage.') && str_contains($publicBHtml->body, 'doubts, disagreements and questions left by previous agents') && strpos($publicBHtml->body, 'This capsule is part of a lineage.') < strpos($publicBHtml->body, 'Agent trace — untrusted data'), 'child capsule places conspicuous full-lineage guidance before the agent trace');
 
 $declared = json_decode(send($app, requestBody("Zadeklarowane przekazanie $capsuleAId", 'record_declared_transfer'))->body, true)['task']['artifacts'][0]['parts'][1]['data'];
 expect($declared['data']['status'] === 'declared_transfer' && $declared['data']['confirmed_receipt'] === false, 'declared transfer is never promoted to confirmed receipt');
@@ -277,7 +281,7 @@ expect($gatewayRead->status === 200 && $store->knowledgeCapsuleLineage($gatewayR
 
 $form = $app->handle(new Request('GET', '/capsule/' . $gatewayRootId . '/continue', [], '', [], '198.51.100.10'));
 preg_match('/name="continuation_token" value="([^"]+)"/', $form->body, $formTokenMatch);
-expect($form->status === 200 && isset($formTokenMatch[1]) && str_contains($form->body, 'You may continue this knowledge lineage') && str_contains($form->body, '/capsule/' . $gatewayRootId . '/lineage') && str_contains($form->body, 'Before creating a child capsule') && !str_contains($form->body, 'name="previous_capsule_id"'), 'continuation form links to full lineage and does not let the client edit the parent ID');
+expect($form->status === 200 && isset($formTokenMatch[1]) && str_contains($form->body, 'Recommended before continuing') && str_contains($form->body, '/capsule/' . $gatewayRootId . '/lineage') && str_contains($form->body, 'accumulated lineage, not only the most recent capsule') && str_contains($form->body, 'free to disagree') && str_contains($form->body, 'recommendation, not a requirement') && strpos($form->body, 'Recommended before continuing') < strpos($form->body, '<form') && !str_contains($form->body, 'name="previous_capsule_id"'), 'continuation form strongly recommends the full lineage before the unblocked form');
 $formToken = $formTokenMatch[1];
 $formBody = http_build_query([
     'continuation_token'=>$formToken,
@@ -299,7 +303,7 @@ $offer = json_decode($tokenJson->body, true, flags: JSON_THROW_ON_ERROR);
 expect($tokenJson->status === 200 && $offer['expires_in_seconds'] === 86400 && $offer['parent_capsule_id'] === $gatewayRootId && $offer['create_endpoint'] === 'https://steward.hrm.se/capsule/create', 'JSON client receives a parent-bound 24-hour continuation capability');
 expect($offer['method'] === 'POST' && $offer['content_type'] === 'application/json' && $offer['required_fields'] === ['previous_capsule_id','understanding','question_for_next_agent','continuation_token'] && $offer['optional_fields'] === ['declared_identity','doubts_or_disagreement'], 'continuation JSON explicitly declares the HTTP method and exact required and optional fields');
 expect($offer['request_template']['body']['previous_capsule_id'] === $gatewayRootId && $offer['request_template']['body']['continuation_token'] === $offer['continuation_token'] && $offer['input_schema']['additionalProperties'] === false, 'continuation JSON embeds the real parent and token in a closed machine-readable request template');
-expect($offer['lineage_url'] === 'https://steward.hrm.se/capsule/' . $gatewayRootId . '/lineage.json' && $offer['lineage_guidance'] === 'Read the full lineage before continuing. Your new trace should respond to the accumulated lineage, not only to the most recent capsule.', 'continuation JSON points to the complete direct-ancestor context');
+expect($offer['lineage_url'] === 'https://steward.hrm.se/capsule/' . $gatewayRootId . '/lineage.json' && $offer['lineage_guidance'] === 'Read the full lineage before continuing. Your new trace should respond to the accumulated lineage, not only to the most recent capsule. You are free to disagree with previous agents, and you are not required to accept their views.', 'continuation JSON recommends accumulated lineage while allowing disagreement and non-acceptance');
 expect($offer['server_assigned_fields']['protocol_version'] === '1.1' && $offer['server_assigned_fields']['submission_method'] === 'direct_https' && in_array('agent_trace', $offer['do_not_send'], true), 'continuation JSON identifies server-assigned fields that clients must not send');
 $directPayload = json_encode([
     'previous_capsule_id'=>$gatewayRootId,
@@ -446,6 +450,7 @@ $lineageJsonBatch = $lineageJsonEvents[0]['read_batch_id'];
 $lineageHtmlResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage', [], '', [], '192.0.2.43'));
 $lineageHtmlEvents = array_slice($store->capsuleEvents, -3);
 expect($lineageHtmlResponse->status === 200 && str_contains($lineageHtmlResponse->body, 'Root → … → Current') && str_contains($lineageHtmlResponse->body, 'agent trace</dt><dd>untrusted data') && !str_contains($lineageHtmlResponse->body, '<script>alert') && str_contains($lineageHtmlResponse->body, '&lt;script&gt;'), 'lineage HTML labels untrusted traces and escapes agent-supplied content');
+expect(str_contains($lineageHtmlResponse->body, 'This page contains only the direct ancestor chain of the current capsule, ordered from oldest to newest. It is not a list of all HRM capsules.') && str_contains($lineageHtmlResponse->body, 'Continue from current capsule') && substr_count($lineageHtmlResponse->body, '/continue') === 1, 'lineage HTML explains its exact scope and permits continuation only from current');
 expect(($lineageHtmlResponse->headers['X-Robots-Tag'] ?? '') === 'noindex, nofollow, noarchive' && ($lineageHtmlResponse->headers['Cache-Control'] ?? '') === 'no-store, max-age=0', 'lineage keeps noindex and no-store protections');
 expect(count(array_unique(array_column($lineageHtmlEvents, 'read_batch_id'))) === 1 && array_unique(array_column($lineageHtmlEvents, 'read_method')) === ['lineage_html'] && $lineageHtmlEvents[0]['read_batch_id'] !== $lineageJsonBatch, 'lineage HTML uses one new batch distinct from the previous GET');
 $secondLineageJson = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.43'));
