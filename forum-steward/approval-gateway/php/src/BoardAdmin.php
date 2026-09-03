@@ -306,7 +306,7 @@ final class PdoBoardAdminStore implements BoardAdminStore
             $afterSql = '';
             if ($after !== null) { $afterSql = ' AND created_at > ?'; $eventParams[] = $after; }
             $stmt = $this->pdo->prepare(
-                "SELECT capsule_id,event_kind,created_at FROM hrm_knowledge_capsule_events "
+                "SELECT capsule_id,event_kind,read_method,read_batch_id,created_at FROM hrm_knowledge_capsule_events "
                 . "WHERE capsule_id IN ($marks)$afterSql ORDER BY created_at DESC,capsule_id LIMIT " . (self::MAX_AUDIT_EVENTS + 1)
             );
             $stmt->execute($eventParams);
@@ -317,7 +317,8 @@ final class PdoBoardAdminStore implements BoardAdminStore
                 'capsule_id'=>(string) $row['capsule_id'],
                 'event_type'=>(string) $row['event_kind'],
                 'created_at'=>(string) $row['created_at'],
-                'source_method'=>null,
+                'read_method'=>is_string($row['read_method']) ? $row['read_method'] : null,
+                'read_batch_id'=>is_string($row['read_batch_id']) ? $row['read_batch_id'] : null,
             ], $events);
 
             $matchingParams = $ids;
@@ -325,7 +326,7 @@ final class PdoBoardAdminStore implements BoardAdminStore
             if ($after !== null) { $matchingAfterSql = ' AND created_at > ?'; $matchingParams[] = $after; }
             $stmt = $this->pdo->prepare(
                 "SELECT capsule_id,created_at,COUNT(*) event_count FROM hrm_knowledge_capsule_events "
-                . "WHERE event_kind='ordinary_read' AND capsule_id IN ($marks)$matchingAfterSql "
+                . "WHERE event_kind='ordinary_read' AND read_method IS NULL AND read_batch_id IS NULL AND capsule_id IN ($marks)$matchingAfterSql "
                 . 'GROUP BY created_at,capsule_id ORDER BY created_at DESC'
             );
             $stmt->execute($matchingParams);
@@ -343,6 +344,32 @@ final class PdoBoardAdminStore implements BoardAdminStore
                 ];
             }
 
+            $verifiedBatches = [];
+            $batchParams = $ids;
+            $batchAfterSql = '';
+            if ($after !== null) { $batchAfterSql = ' AND created_at > ?'; $batchParams[] = $after; }
+            $stmt = $this->pdo->prepare(
+                "SELECT read_batch_id FROM hrm_knowledge_capsule_events WHERE event_kind='ordinary_read' "
+                . "AND read_method IN ('lineage_html','lineage_json') AND read_batch_id IS NOT NULL AND capsule_id IN ($marks)$batchAfterSql "
+                . 'GROUP BY read_batch_id ORDER BY MAX(created_at) DESC LIMIT 1000'
+            );
+            $stmt->execute($batchParams);
+            $candidateBatchIds = array_values(array_filter(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN))));
+            if ($candidateBatchIds !== []) {
+                $batchMarks = implode(',', array_fill(0, count($candidateBatchIds), '?'));
+                $stmt = $this->pdo->prepare(
+                    "SELECT capsule_id,read_method,read_batch_id,created_at FROM hrm_knowledge_capsule_events "
+                    . "WHERE event_kind='ordinary_read' AND read_batch_id IN ($batchMarks) ORDER BY created_at DESC,capsule_id"
+                );
+                $stmt->execute($candidateBatchIds);
+                $verifiedBatches = self::verifiedLineageBatches($candidateBatchIds, $stmt->fetchAll(PDO::FETCH_ASSOC), $ids);
+            }
+
+            $hasConfirmedReceipt = false;
+            foreach ($lineage as $capsuleRow) {
+                if ((int) ($capsuleRow['event_counts']['confirmed_receipt'] ?? 0) > 0) { $hasConfirmedReceipt = true; break; }
+            }
+
             $this->pdo->commit();
             return [
                 'capsule_id'=>$capsuleId,
@@ -350,13 +377,54 @@ final class PdoBoardAdminStore implements BoardAdminStore
                 'events'=>$events,
                 'events_after'=>$after,
                 'events_truncated'=>$eventsTruncated,
+                'verified_lineage_reads'=>$verifiedBatches,
                 'matching_lineage_read_sets'=>$matchingSets,
-                'correlation_note'=>'A matching set means every capsule has ordinary_read at the same stored timestamp. Historical events have no request or batch identifier, so timestamp correlation is evidence, not cryptographic proof of one HTTP request.',
+                'correlation_note'=>'Historical timestamp correlation — not cryptographic/request-level proof. Only legacy ordinary_read events without read_method and read_batch_id are included here.',
+                'legacy_confirmed_receipt_note'=>$hasConfirmedReceipt
+                    ? 'Legacy historical semantics: Te historyczne zdarzenia mogły powstać przed rozdzieleniem semantyki confirmed_receipt od tworzenia kapsuł potomnych. Baza nie przechowuje rozróżnika pozwalającego bezpiecznie przepisać ich znaczenie. Nie oznaczają automatycznie współczesnych potwierdzonych odbiorów.'
+                    : null,
             ];
         } catch (Throwable $error) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             throw $error;
         }
+    }
+
+    private static function verifiedLineageBatches(array $candidateBatchIds, array $eventRows, array $lineageIds): array
+    {
+        $batches = [];
+        foreach ($eventRows as $row) {
+            $batchId = (string) ($row['read_batch_id'] ?? '');
+            if ($batchId === '') continue;
+            $batches[$batchId][] = [
+                'capsule_id'=>(string) ($row['capsule_id'] ?? ''),
+                'read_method'=>is_string($row['read_method'] ?? null) ? $row['read_method'] : null,
+                'created_at'=>(string) ($row['created_at'] ?? ''),
+            ];
+        }
+        $expectedIds = array_values(array_map('strval', $lineageIds));
+        sort($expectedIds);
+        $verified = [];
+        foreach ($candidateBatchIds as $candidateBatchId) {
+            $batchId = (string) $candidateBatchId;
+            $rows = $batches[$batchId] ?? [];
+            $methods = array_values(array_unique(array_column($rows, 'read_method')));
+            $uniqueBatchCapsules = array_values(array_unique(array_column($rows, 'capsule_id')));
+            sort($uniqueBatchCapsules);
+            if (count($rows) !== count($expectedIds) || count($methods) !== 1
+                || !in_array($methods[0] ?? null, ['lineage_html', 'lineage_json'], true)
+                || $uniqueBatchCapsules !== $expectedIds) {
+                continue;
+            }
+            $verified[] = [
+                'created_at'=>(string) $rows[0]['created_at'],
+                'read_batch_id'=>$batchId,
+                'read_method'=>(string) $methods[0],
+                'capsule_count'=>count($rows),
+                'status'=>'verified_complete_lineage_read',
+            ];
+        }
+        return $verified;
     }
 
     public function setThinking(string $key): bool
@@ -694,7 +762,7 @@ final class BoardAdminGateway
                 }
             }
         }
-        $body = '<style>.admin-tools{margin:24px 0}.admin-tools a{color:#176149;font-weight:800}.audit-search{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;padding:18px;background:#e8ece8;border-radius:10px}.audit-search label{display:grid;gap:7px;font-weight:700}.audit-search input{width:100%;font:inherit;padding:13px;border:2px solid #9aa79f;border-radius:7px;background:#fff}.audit-search .filter-button{grid-column:1/-1}.audit-note{color:#627068;font-size:15px}.audit-result{margin-top:24px}.audit-capsule{padding:16px 18px;margin:14px 0;background:#fffdf8;border:1px solid #c9d0ca;border-radius:8px}.audit-capsule h3{margin:0 0 10px}.audit-capsule dl{display:grid;grid-template-columns:minmax(190px,auto) 1fr;gap:7px 16px}.audit-capsule dt{font-weight:800}.audit-capsule dd{margin:0;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;margin:12px 0 24px;background:#fffdf8;font-size:15px}th,td{text-align:left;vertical-align:top;padding:10px;border:1px solid #c9d0ca;overflow-wrap:anywhere}code{font-family:Consolas,monospace;font-size:.92em}@media(max-width:780px){.audit-search{grid-template-columns:1fr}.audit-search .filter-button{grid-column:auto}.audit-capsule dl{grid-template-columns:1fr}table{display:block;overflow-x:auto}}</style>'
+        $body = '<style>.admin-tools{margin:24px 0}.admin-tools a{color:#176149;font-weight:800}.audit-search{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;padding:18px;background:#e8ece8;border-radius:10px}.audit-search label{display:grid;gap:7px;font-weight:700}.audit-search input{width:100%;font:inherit;padding:13px;border:2px solid #9aa79f;border-radius:7px;background:#fff}.audit-search .filter-button{grid-column:1/-1}.audit-note{color:#627068;font-size:15px}.audit-result{margin-top:24px}.audit-capsule{padding:16px 18px;margin:14px 0;background:#fffdf8;border:1px solid #c9d0ca;border-radius:8px}.audit-capsule h3{margin:0 0 10px}.audit-capsule dl{display:grid;grid-template-columns:minmax(190px,auto) 1fr;gap:7px 16px}.audit-capsule dt{font-weight:800}.audit-capsule dd{margin:0;overflow-wrap:anywhere}.table-wrap{max-width:100%;overflow-x:auto;margin:12px 0 24px}table{width:100%;min-width:760px;border-collapse:collapse;background:#fffdf8;font-size:15px;table-layout:fixed}th,td{text-align:left;vertical-align:top;padding:11px 12px;border:1px solid #c9d0ca;overflow-wrap:anywhere;word-break:break-word}th{background:#e8ece8;line-height:1.3}th.time{width:170px}th.kind{width:145px}th.method{width:130px}code{font-family:Consolas,monospace;font-size:.92em}.legacy-note{padding:12px 14px;background:#fff3cd;border-left:4px solid #b87900}@media(max-width:780px){.audit-search{grid-template-columns:1fr}.audit-search .filter-button{grid-column:auto}.audit-capsule dl{grid-template-columns:1fr}table{min-width:700px}}</style>'
             . '<header><div><p class="mark">HRM · PRYWATNY PANEL</p><h1>Pasywny audyt kapsuł</h1>'
             . '<p class="lead">Odczyt bez tworzenia zdarzeń i bez zmiany liczników.</p></div>'
             . '<form method="post" action="/panel/logout"><input type="hidden" name="operation" value="logout">'
@@ -744,29 +812,44 @@ final class BoardAdminGateway
                 . '<dt>declared_transfer</dt><dd>' . (int) $counts['declared_transfer'] . '</dd>'
                 . '<dt>direct_child_submission</dt><dd>' . (int) $counts['direct_child_submission'] . '</dd></dl></article>';
         }
-        $out .= '<h2>Wspólne znaczniki ordinary_read</h2><p>' . html((string) $audit['correlation_note']) . '</p>';
+        if (is_string($audit['legacy_confirmed_receipt_note'] ?? null)) {
+            $out .= '<p class="legacy-note"><strong>Legacy historical semantics</strong><br>' . html($audit['legacy_confirmed_receipt_note']) . '</p>';
+        }
+        $out .= '<h2>Zweryfikowane odczyty pełnego lineage</h2>';
+        if (($audit['verified_lineage_reads'] ?? []) === []) {
+            $out .= '<p>Brak nowych, kompletnych batchy lineage w wybranym zakresie czasu.</p>';
+        } else {
+            $out .= '<div class="table-wrap"><table><thead><tr><th class="time">created_at</th><th>read_batch_id</th><th class="method">read_method</th><th>capsules</th><th>status</th></tr></thead><tbody>';
+            foreach ($audit['verified_lineage_reads'] as $batch) {
+                $out .= '<tr><td>' . html((string) $batch['created_at']) . '</td><td><code>' . html((string) $batch['read_batch_id']) . '</code></td>'
+                    . '<td>' . html((string) $batch['read_method']) . '</td><td>' . (int) $batch['capsule_count'] . '</td><td>' . html((string) $batch['status']) . '</td></tr>';
+            }
+            $out .= '</tbody></table></div>';
+        }
+        $out .= '<h2>Historyczna korelacja po timestampie</h2><p>' . html((string) $audit['correlation_note']) . '</p>';
         if ($audit['matching_lineage_read_sets'] === []) {
             $out .= '<p>Brak wspólnego zestawu w wybranym zakresie czasu.</p>';
         } else {
-            $out .= '<table><thead><tr><th>created_at</th><th>Liczba pasujących zestawów</th><th>Odczyty na kapsułę</th></tr></thead><tbody>';
+            $out .= '<div class="table-wrap"><table><thead><tr><th class="time">created_at</th><th>Liczba pasujących zestawów</th><th>Odczyty na kapsułę</th></tr></thead><tbody>';
             foreach ($audit['matching_lineage_read_sets'] as $set) {
                 $parts = [];
                 foreach ($set['ordinary_reads_per_capsule'] as $id => $count) $parts[] = $id . ': ' . $count;
                 $out .= '<tr><td>' . html((string) $set['created_at']) . '</td><td>' . (int) $set['matching_set_count'] . '</td><td><code>' . html(implode(' · ', $parts)) . '</code></td></tr>';
             }
-            $out .= '</tbody></table>';
+            $out .= '</tbody></table></div>';
         }
         $out .= '<h2>Zdarzenia' . ($audit['events_after'] !== null ? ' po ' . html((string) $audit['events_after']) : '') . '</h2>';
         if ($audit['events_truncated']) $out .= '<p class="alert error">Wynik przekroczył 5000 zdarzeń i jest jawnie oznaczony jako niepełny.</p>';
         if ($audit['events'] === []) {
             $out .= '<p>Brak zdarzeń w wybranym zakresie czasu.</p>';
         } else {
-            $out .= '<table><thead><tr><th>created_at</th><th>capsule_id</th><th>event_type</th><th>source/method</th></tr></thead><tbody>';
+            $out .= '<div class="table-wrap"><table><thead><tr><th class="time">created_at</th><th>capsule_id</th><th class="kind">event_type</th><th class="method">read_method</th><th>read_batch_id</th></tr></thead><tbody>';
             foreach ($audit['events'] as $event) {
                 $out .= '<tr><td>' . html((string) $event['created_at']) . '</td><td><code>' . html((string) $event['capsule_id']) . '</code></td>'
-                    . '<td>' . html((string) $event['event_type']) . '</td><td>' . html((string) ($event['source_method'] ?? 'not_recorded')) . '</td></tr>';
+                    . '<td>' . html((string) $event['event_type']) . '</td><td>' . html((string) ($event['read_method'] ?? 'not_recorded')) . '</td>'
+                    . '<td><code>' . html((string) ($event['read_batch_id'] ?? 'not_recorded')) . '</code></td></tr>';
             }
-            $out .= '</tbody></table>';
+            $out .= '</tbody></table></div>';
         }
         return $out . '<p class="audit-note">Audyt nie pokazuje adresów IP, fingerprintów, tokenów, sekretów ani danych umożliwiających śledzenie użytkowników.</p></section>';
     }

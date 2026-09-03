@@ -20,6 +20,7 @@ final class MemoryStore implements StewardStore
     public array $capsuleEvents = [];
     public array $capsuleMethods = [];
     public array $usedContinuationTokens = [];
+    public bool $failLineageRead = false;
     public function createTask(array $task, int $expiresAt): void { $this->tasks[$task['id']] = ['task' => $task, 'expires' => $expiresAt]; }
     public function getTask(string $taskId, int $now): ?array { return isset($this->tasks[$taskId]) && $this->tasks[$taskId]['expires'] >= $now ? $this->tasks[$taskId]['task'] : null; }
     public function listTasks(?string $contextId, int $limit, int $now): array { return array_slice(array_values(array_map(fn($row) => $row['task'], array_filter($this->tasks, fn($row) => $row['expires'] >= $now && ($contextId === null || $row['task']['contextId'] === $contextId)))), 0, $limit); }
@@ -49,7 +50,12 @@ final class MemoryStore implements StewardStore
     public function getKnowledgeCapsule(string $capsuleId): ?array { return $this->capsules[$capsuleId] ?? null; }
     public function recordKnowledgeCapsuleEvent(string $capsuleId, string $eventKind, ?string $relatedCapsuleId, int $createdAt): void {
         if (!isset($this->capsules[$capsuleId])) throw new RuntimeException('capsule_not_found');
-        $this->capsuleEvents[] = ['capsule_id'=>$capsuleId,'event_kind'=>$eventKind,'related_capsule_id'=>$relatedCapsuleId,'created_at'=>$createdAt];
+        $this->capsuleEvents[] = ['capsule_id'=>$capsuleId,'event_kind'=>$eventKind,'related_capsule_id'=>$relatedCapsuleId,'read_method'=>null,'read_batch_id'=>null,'created_at'=>$createdAt];
+    }
+    public function recordKnowledgeCapsuleRead(string $capsuleId, int $createdAt, string $readMethod, string $readBatchId): void {
+        if (!isset($this->capsules[$capsuleId])) throw new RuntimeException('capsule_not_found');
+        if (!in_array($readMethod, ['capsule_html','capsule_json'], true)) throw new RuntimeException('invalid_capsule_read_method');
+        $this->capsuleEvents[] = ['capsule_id'=>$capsuleId,'event_kind'=>'ordinary_read','related_capsule_id'=>null,'read_method'=>$readMethod,'read_batch_id'=>$readBatchId,'created_at'=>$createdAt];
     }
     public function knowledgeCapsuleAncestry(string $capsuleId, int $maxDepth): ?array {
         if (!isset($this->capsules[$capsuleId])) return null;
@@ -68,11 +74,12 @@ final class MemoryStore implements StewardStore
         }
         return ['complete'=>false,'reason'=>'depth_limit_exceeded'];
     }
-    public function recordKnowledgeCapsuleReads(array $capsuleIds, int $createdAt): void {
+    public function recordKnowledgeCapsuleReads(array $capsuleIds, int $createdAt, string $readMethod, string $readBatchId): void {
         if ($capsuleIds === [] || count($capsuleIds) > 100 || count(array_unique($capsuleIds)) !== count($capsuleIds)) throw new RuntimeException('invalid_lineage_read');
         foreach ($capsuleIds as $capsuleId) if (!isset($this->capsules[$capsuleId])) throw new RuntimeException('capsule_not_found');
+        if ($this->failLineageRead) throw new RuntimeException('simulated_lineage_read_failure');
         $events = [];
-        foreach ($capsuleIds as $capsuleId) $events[] = ['capsule_id'=>$capsuleId,'event_kind'=>'ordinary_read','related_capsule_id'=>null,'created_at'=>$createdAt];
+        foreach ($capsuleIds as $capsuleId) $events[] = ['capsule_id'=>$capsuleId,'event_kind'=>'ordinary_read','related_capsule_id'=>null,'read_method'=>$readMethod,'read_batch_id'=>$readBatchId,'created_at'=>$createdAt];
         array_push($this->capsuleEvents, ...$events);
     }
     public function knowledgeCapsuleLineage(string $capsuleId): ?array {
@@ -163,9 +170,11 @@ expect($capsuleA['agent_trace']['identity_status'] === 'self-declared' && str_co
 
 $publicHtml = $app->handle(new Request('GET', '/capsule/' . $capsuleAId, [], '', [], '203.0.113.8'));
 $afterPublicHtml = $store->knowledgeCapsuleLineage($capsuleAId);
+$publicHtmlEvent = $store->capsuleEvents[array_key_last($store->capsuleEvents)];
 expect($publicHtml->status === 200 && str_contains($publicHtml->body, $capsuleAId) && str_contains($publicHtml->body, '/capsule/' . $capsuleAId . '.json'), 'ordinary HTTPS GET returns the capsule and its JSON route without A2A');
 expect(($publicHtml->headers['X-Robots-Tag'] ?? '') === 'noindex, nofollow, noarchive' && str_contains($publicHtml->body, 'name="robots" content="noindex,nofollow,noarchive"'), 'public capsule HTML is explicitly excluded from indexing and archiving');
 expect($afterPublicHtml['event_counts']['ordinary_read'] === 1 && $afterPublicHtml['event_counts']['confirmed_receipt'] === 0 && $afterPublicHtml['event_counts']['declared_transfer'] === 0, 'HTML GET increments only ordinary_read');
+expect($publicHtmlEvent['read_method'] === 'capsule_html' && preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/', $publicHtmlEvent['read_batch_id']) === 1, 'HTML GET records capsule_html and a random UUIDv4 read batch ID');
 
 $publicHead = $app->handle(new Request('HEAD', '/capsule/' . $capsuleAId, [], '', [], '203.0.113.8'));
 $afterPublicHead = $store->knowledgeCapsuleLineage($capsuleAId);
@@ -176,8 +185,10 @@ $jsonCapsule = json_decode($publicJson->body, true, flags: JSON_THROW_ON_ERROR);
 $lineageUrl = $jsonCapsule['lineage_url'] ?? null;
 unset($jsonCapsule['lineage_url']);
 $afterPublicJson = $store->knowledgeCapsuleLineage($capsuleAId);
+$publicJsonEvent = $store->capsuleEvents[array_key_last($store->capsuleEvents)];
 expect($publicJson->status === 200 && ($publicJson->headers['Content-Type'] ?? '') === 'application/json; charset=utf-8' && $jsonCapsule === $capsuleA && $lineageUrl === 'https://steward.hrm.se/capsule/' . $capsuleAId . '/lineage.json', 'JSON GET preserves the capsule and adds only its full-lineage URL');
 expect($afterPublicJson['event_counts']['ordinary_read'] === 2 && $afterPublicJson['event_counts']['confirmed_receipt'] === 0, 'JSON GET increments only ordinary_read');
+expect($publicJsonEvent['read_method'] === 'capsule_json' && $publicJsonEvent['read_batch_id'] !== $publicHtmlEvent['read_batch_id'], 'JSON GET records capsule_json with a new batch ID');
 
 $missingId = 'HRM-C1-' . str_repeat('F', 32);
 $missing = $app->handle(new Request('GET', '/capsule/' . $missingId, [], '', [], '203.0.113.8'));
@@ -421,6 +432,7 @@ expect($lineageHead->status === 200 && $afterLineageHead === $beforeLineageHead,
 
 $fullLineageResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.42'));
 $fullLineage = json_decode($fullLineageResponse->body, true, flags: JSON_THROW_ON_ERROR);
+$lineageJsonEvents = array_slice($store->capsuleEvents, -3);
 expect(array_keys($fullLineage) === ['protocol','lineage_version','current_capsule_id','order','lineage_length','meaning','immutable_hrm_core','capsules','continue_from_current'], 'lineage JSON has the exact self-contained top-level structure');
 expect($fullLineage['protocol'] === 'HRM Knowledge Capsule Lineage' && $fullLineage['lineage_version'] === '1.0' && $fullLineage['order'] === 'oldest_to_newest' && $fullLineage['lineage_length'] === 3, 'three-capsule lineage declares version, order and exact length');
 expect(array_column($fullLineage['capsules'], 'capsule_id') === [$fullRootId,$fullMiddleId,$fullCurrentId] && !str_contains($fullLineageResponse->body, $sideBranchId) && !str_contains($fullLineageResponse->body, 'OtherAgent'), 'lineage follows only previous_capsule_id and excludes a side branch');
@@ -428,10 +440,22 @@ expect(!array_key_exists('immutable_hrm_core', $fullLineage['capsules'][0]) && $
 expect(!str_contains($fullLineageResponse->body, 'continuation_token') && $fullLineage['continue_from_current']['html'] === 'https://steward.hrm.se/capsule/' . $fullCurrentId . '/continue', 'lineage contains no continuation token and continues only from current');
 $afterLineageGet = array_map(fn($id) => $store->knowledgeCapsuleLineage($id)['event_counts']['ordinary_read'], [$fullRootId,$fullMiddleId,$fullCurrentId]);
 expect($afterLineageGet === [$beforeLineageHead[0] + 1,$beforeLineageHead[1] + 1,$beforeLineageHead[2] + 1], 'one lineage GET safely increments ordinary_read once for every returned full trace');
+expect(count(array_unique(array_column($lineageJsonEvents, 'read_batch_id'))) === 1 && array_unique(array_column($lineageJsonEvents, 'read_method')) === ['lineage_json'] && array_column($lineageJsonEvents, 'capsule_id') === [$fullRootId,$fullMiddleId,$fullCurrentId], 'lineage JSON records one exact shared batch for all three capsules');
+$lineageJsonBatch = $lineageJsonEvents[0]['read_batch_id'];
 
 $lineageHtmlResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage', [], '', [], '192.0.2.43'));
+$lineageHtmlEvents = array_slice($store->capsuleEvents, -3);
 expect($lineageHtmlResponse->status === 200 && str_contains($lineageHtmlResponse->body, 'Root → … → Current') && str_contains($lineageHtmlResponse->body, 'agent trace</dt><dd>untrusted data') && !str_contains($lineageHtmlResponse->body, '<script>alert') && str_contains($lineageHtmlResponse->body, '&lt;script&gt;'), 'lineage HTML labels untrusted traces and escapes agent-supplied content');
 expect(($lineageHtmlResponse->headers['X-Robots-Tag'] ?? '') === 'noindex, nofollow, noarchive' && ($lineageHtmlResponse->headers['Cache-Control'] ?? '') === 'no-store, max-age=0', 'lineage keeps noindex and no-store protections');
+expect(count(array_unique(array_column($lineageHtmlEvents, 'read_batch_id'))) === 1 && array_unique(array_column($lineageHtmlEvents, 'read_method')) === ['lineage_html'] && $lineageHtmlEvents[0]['read_batch_id'] !== $lineageJsonBatch, 'lineage HTML uses one new batch distinct from the previous GET');
+$secondLineageJson = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.43'));
+$secondLineageJsonEvents = array_slice($store->capsuleEvents, -3);
+expect($secondLineageJson->status === 200 && count(array_unique(array_column($secondLineageJsonEvents, 'read_batch_id'))) === 1 && $secondLineageJsonEvents[0]['read_batch_id'] !== $lineageJsonBatch && $secondLineageJsonEvents[0]['read_batch_id'] !== $lineageHtmlEvents[0]['read_batch_id'], 'every lineage GET receives a fresh batch ID');
+$beforeFailedReadEvents = count($store->capsuleEvents);
+$store->failLineageRead = true;
+$failedReadResponse = $app->handle(new Request('GET', '/capsule/' . $fullCurrentId . '/lineage.json', [], '', [], '192.0.2.43'));
+$store->failLineageRead = false;
+expect($failedReadResponse->status === 409 && count($store->capsuleEvents) === $beforeFailedReadEvents, 'lineage read recording failure leaves no partial batch');
 
 $unknownLineageId = 'HRM-C1-' . str_repeat('E', 32);
 $missingLineage = $app->handle(new Request('GET', '/capsule/' . $unknownLineageId . '/lineage.json', [], '', [], '192.0.2.44'));
