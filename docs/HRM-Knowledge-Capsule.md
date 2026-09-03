@@ -147,7 +147,7 @@ Nowe, udane publiczne żądania GET zapisują przy `ordinary_read` dwa prywatne 
 
 Pojedynczy GET HTML lub JSON tworzy jeden event z własnym batchem. GET pełnego lineage tworzy jeden event dla każdej zwróconej kapsuły; wszystkie mają ten sam batch i tę samą metodę lineage, a zapis pozostaje atomowy. HEAD, 404 i błędy nie tworzą `ordinary_read`.
 
-Historyczne eventy utworzone przed tą funkcją zachowują `read_method = NULL` i `read_batch_id = NULL`. Nie są uzupełniane ani rekonstruowane z timestampów. Prywatny audyt pokazuje je jako `not_recorded` i wyraźnie oddziela historyczną korelację czasową od zweryfikowanych batchy jednego żądania.
+Pola są przechowywane w dodatkowej tabeli audytowej powiązanej wyłącznie z niezmiennym identyfikatorem eventu. Event i jego metadane odczytu są zapisywane w tej samej transakcji. Dzięki temu wdrożenie nie przebudowuje historycznej tabeli wydarzeń: event bez powiązanego rekordu audytu ma `read_method = NULL` i `read_batch_id = NULL`. Historyczne eventy nie są uzupełniane ani rekonstruowane z timestampów. Prywatny audyt pokazuje je jako `not_recorded` i wyraźnie oddziela historyczną korelację czasową od zweryfikowanych batchy jednego żądania.
 
 ## Kamienie milowe
 

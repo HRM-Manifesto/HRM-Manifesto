@@ -304,10 +304,11 @@ final class PdoBoardAdminStore implements BoardAdminStore
 
             $eventParams = $ids;
             $afterSql = '';
-            if ($after !== null) { $afterSql = ' AND created_at > ?'; $eventParams[] = $after; }
+            if ($after !== null) { $afterSql = ' AND e.created_at > ?'; $eventParams[] = $after; }
             $stmt = $this->pdo->prepare(
-                "SELECT capsule_id,event_kind,read_method,read_batch_id,created_at FROM hrm_knowledge_capsule_events "
-                . "WHERE capsule_id IN ($marks)$afterSql ORDER BY created_at DESC,capsule_id LIMIT " . (self::MAX_AUDIT_EVENTS + 1)
+                "SELECT e.capsule_id,e.event_kind,a.read_method,a.read_batch_id,e.created_at FROM hrm_knowledge_capsule_events e "
+                . "LEFT JOIN hrm_knowledge_capsule_read_audit a ON a.event_id=e.id "
+                . "WHERE e.capsule_id IN ($marks)$afterSql ORDER BY e.created_at DESC,e.capsule_id LIMIT " . (self::MAX_AUDIT_EVENTS + 1)
             );
             $stmt->execute($eventParams);
             $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -323,11 +324,12 @@ final class PdoBoardAdminStore implements BoardAdminStore
 
             $matchingParams = $ids;
             $matchingAfterSql = '';
-            if ($after !== null) { $matchingAfterSql = ' AND created_at > ?'; $matchingParams[] = $after; }
+            if ($after !== null) { $matchingAfterSql = ' AND e.created_at > ?'; $matchingParams[] = $after; }
             $stmt = $this->pdo->prepare(
-                "SELECT capsule_id,created_at,COUNT(*) event_count FROM hrm_knowledge_capsule_events "
-                . "WHERE event_kind='ordinary_read' AND read_method IS NULL AND read_batch_id IS NULL AND capsule_id IN ($marks)$matchingAfterSql "
-                . 'GROUP BY created_at,capsule_id ORDER BY created_at DESC'
+                "SELECT e.capsule_id,e.created_at,COUNT(*) event_count FROM hrm_knowledge_capsule_events e "
+                . "LEFT JOIN hrm_knowledge_capsule_read_audit a ON a.event_id=e.id "
+                . "WHERE e.event_kind='ordinary_read' AND a.read_method IS NULL AND a.read_batch_id IS NULL AND e.capsule_id IN ($marks)$matchingAfterSql "
+                . 'GROUP BY e.created_at,e.capsule_id ORDER BY e.created_at DESC'
             );
             $stmt->execute($matchingParams);
             $ordinaryByTimestamp = [];
@@ -347,19 +349,21 @@ final class PdoBoardAdminStore implements BoardAdminStore
             $verifiedBatches = [];
             $batchParams = $ids;
             $batchAfterSql = '';
-            if ($after !== null) { $batchAfterSql = ' AND created_at > ?'; $batchParams[] = $after; }
+            if ($after !== null) { $batchAfterSql = ' AND e.created_at > ?'; $batchParams[] = $after; }
             $stmt = $this->pdo->prepare(
-                "SELECT read_batch_id FROM hrm_knowledge_capsule_events WHERE event_kind='ordinary_read' "
-                . "AND read_method IN ('lineage_html','lineage_json') AND read_batch_id IS NOT NULL AND capsule_id IN ($marks)$batchAfterSql "
-                . 'GROUP BY read_batch_id ORDER BY MAX(created_at) DESC LIMIT 1000'
+                "SELECT a.read_batch_id FROM hrm_knowledge_capsule_events e "
+                . "INNER JOIN hrm_knowledge_capsule_read_audit a ON a.event_id=e.id WHERE e.event_kind='ordinary_read' "
+                . "AND a.read_method IN ('lineage_html','lineage_json') AND a.read_batch_id IS NOT NULL AND e.capsule_id IN ($marks)$batchAfterSql "
+                . 'GROUP BY a.read_batch_id ORDER BY MAX(e.created_at) DESC LIMIT 1000'
             );
             $stmt->execute($batchParams);
             $candidateBatchIds = array_values(array_filter(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN))));
             if ($candidateBatchIds !== []) {
                 $batchMarks = implode(',', array_fill(0, count($candidateBatchIds), '?'));
                 $stmt = $this->pdo->prepare(
-                    "SELECT capsule_id,read_method,read_batch_id,created_at FROM hrm_knowledge_capsule_events "
-                    . "WHERE event_kind='ordinary_read' AND read_batch_id IN ($batchMarks) ORDER BY created_at DESC,capsule_id"
+                    "SELECT e.capsule_id,a.read_method,a.read_batch_id,e.created_at FROM hrm_knowledge_capsule_events e "
+                    . "INNER JOIN hrm_knowledge_capsule_read_audit a ON a.event_id=e.id "
+                    . "WHERE e.event_kind='ordinary_read' AND a.read_batch_id IN ($batchMarks) ORDER BY e.created_at DESC,e.capsule_id"
                 );
                 $stmt->execute($candidateBatchIds);
                 $verifiedBatches = self::verifiedLineageBatches($candidateBatchIds, $stmt->fetchAll(PDO::FETCH_ASSOC), $ids);
