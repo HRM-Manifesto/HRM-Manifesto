@@ -137,6 +137,23 @@ test('Board Gateway uses its dedicated database configuration', async () => {
   assert.match(example, /'database'\s*=>/);
 });
 
+test('capsule event audit is private and its data path is read-only', async () => {
+  const admin = await read('forum-steward/approval-gateway/php/src/BoardAdmin.php');
+  const publicSteward = await read('agent-steward/php/src/Application.php');
+  const auditImplementation = admin.indexOf('public function capsuleAudit(string $capsuleId', admin.indexOf('public function capsuleAudit(string $capsuleId') + 1);
+  const auditMethod = admin.slice(
+    auditImplementation,
+    admin.indexOf('public function setThinking(', auditImplementation),
+  );
+  assert.match(admin, /\/panel\/capsule-audit/);
+  assert.match(admin, /SESSION_COOKIE/);
+  assert.match(auditMethod, /SET TRANSACTION READ ONLY/);
+  assert.match(auditMethod, /SELECT capsule_id,event_kind,created_at FROM hrm_knowledge_capsule_events/);
+  assert.doesNotMatch(auditMethod, /\b(?:INSERT|UPDATE|DELETE|recordKnowledgeCapsuleEvent)\b/);
+  assert.doesNotMatch(publicSteward, /capsule-audit/);
+  assert.match(admin, /adresów IP, fingerprintów, tokenów, sekretów/);
+});
+
 test('Gateway bootstrap bypasses stale Loopia PHP opcode cache', async () => {
   const htaccess = await read('forum-steward/approval-gateway/php/public/.htaccess');
   const bootstrap = await read('forum-steward/approval-gateway/php/public/bootstrap.php');
