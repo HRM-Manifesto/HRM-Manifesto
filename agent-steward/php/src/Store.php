@@ -95,13 +95,15 @@ final class PdoStewardStore implements StewardStore
             capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             event_kind VARCHAR(30) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             related_capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NULL,
+            created_at DATETIME(3) NOT NULL,
+            PRIMARY KEY (id), KEY ix_hrm_capsule_event (capsule_id, event_kind, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS hrm_knowledge_capsule_read_audit (
+            event_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             read_method VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin NULL,
             read_batch_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
-            created_at DATETIME(3) NOT NULL,
-            PRIMARY KEY (id), KEY ix_hrm_capsule_event (capsule_id, event_kind, created_at),
-            KEY ix_hrm_capsule_read_batch (read_batch_id, event_kind)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $this->ensureCapsuleReadAuditColumns();
+            PRIMARY KEY (event_id), KEY ix_hrm_capsule_read_batch (read_batch_id, read_method)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_bin");
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS hrm_knowledge_capsule_creations (
             capsule_id CHAR(39) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
             submission_method VARCHAR(30) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
@@ -285,10 +287,21 @@ final class PdoStewardStore implements StewardStore
         if (!in_array($readMethod, ['capsule_html', 'capsule_json'], true)) {
             throw new RuntimeException('invalid_capsule_read_method');
         }
-        if ($this->getKnowledgeCapsule($capsuleId) === null) {
-            throw new RuntimeException('capsule_not_found');
+        $this->pdo->beginTransaction();
+        try {
+            $existing = $this->pdo->prepare('SELECT capsule_id FROM hrm_knowledge_capsules WHERE capsule_id = ? FOR UPDATE');
+            $existing->execute([$capsuleId]);
+            if ($existing->fetchColumn() === false) {
+                throw new RuntimeException('capsule_not_found');
+            }
+            $this->insertCapsuleEvent($capsuleId, 'ordinary_read', null, $createdAt, $readMethod, $readBatchId);
+            $this->pdo->commit();
+        } catch (\Throwable $error) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $error;
         }
-        $this->insertCapsuleEvent($capsuleId, 'ordinary_read', null, $createdAt, $readMethod, $readBatchId);
     }
 
     public function knowledgeCapsuleAncestry(string $capsuleId, int $maxDepth): ?array
@@ -419,58 +432,13 @@ final class PdoStewardStore implements StewardStore
             || ($eventKind !== 'ordinary_read' && ($readMethod !== null || $readBatchId !== null))) {
             throw new RuntimeException('invalid_capsule_read_metadata');
         }
-        $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_events (id, capsule_id, event_kind, related_capsule_id, read_method, read_batch_id, created_at) VALUES (?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?))');
-        $stmt->execute([uuidV4(), $capsuleId, $eventKind, $relatedCapsuleId, $readMethod, $readBatchId, $createdAt]);
-    }
-
-    private function ensureCapsuleReadAuditColumns(): void
-    {
-        $columns = $this->pdo->query('SHOW COLUMNS FROM hrm_knowledge_capsule_events')->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('read_method', $columns, true) || !in_array('read_batch_id', $columns, true)) {
-            $this->backupCapsuleEventsBeforeReadAuditV2();
+        $eventId = uuidV4();
+        $stmt = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_events (id, capsule_id, event_kind, related_capsule_id, created_at) VALUES (?, ?, ?, ?, FROM_UNIXTIME(?))');
+        $stmt->execute([$eventId, $capsuleId, $eventKind, $relatedCapsuleId, $createdAt]);
+        if ($readMethod !== null && $readBatchId !== null) {
+            $audit = $this->pdo->prepare('INSERT INTO hrm_knowledge_capsule_read_audit (event_id, read_method, read_batch_id) VALUES (?, ?, ?)');
+            $audit->execute([$eventId, $readMethod, $readBatchId]);
         }
-        if (!in_array('read_method', $columns, true)) {
-            try {
-                $this->pdo->exec('ALTER TABLE hrm_knowledge_capsule_events ADD COLUMN read_method VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER related_capsule_id');
-            } catch (PDOException $error) {
-                if (!$this->capsuleEventColumnExists('read_method')) throw $error;
-            }
-        }
-        if (!in_array('read_batch_id', $columns, true)) {
-            try {
-                $this->pdo->exec('ALTER TABLE hrm_knowledge_capsule_events ADD COLUMN read_batch_id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER read_method');
-            } catch (PDOException $error) {
-                if (!$this->capsuleEventColumnExists('read_batch_id')) throw $error;
-            }
-        }
-        $indexes = $this->pdo->query('SHOW INDEX FROM hrm_knowledge_capsule_events')->fetchAll(PDO::FETCH_ASSOC);
-        if (!in_array('ix_hrm_capsule_read_batch', array_column($indexes, 'Key_name'), true)) {
-            try {
-                $this->pdo->exec('ALTER TABLE hrm_knowledge_capsule_events ADD KEY ix_hrm_capsule_read_batch (read_batch_id, event_kind)');
-            } catch (PDOException $error) {
-                if (!$this->capsuleEventIndexExists('ix_hrm_capsule_read_batch')) throw $error;
-            }
-        }
-    }
-
-    private function backupCapsuleEventsBeforeReadAuditV2(): void
-    {
-        $this->pdo->exec('CREATE TABLE IF NOT EXISTS hrm_knowledge_capsule_events_backup_read_audit_v2 LIKE hrm_knowledge_capsule_events');
-        $this->pdo->exec('INSERT IGNORE INTO hrm_knowledge_capsule_events_backup_read_audit_v2 (id,capsule_id,event_kind,related_capsule_id,created_at) SELECT id,capsule_id,event_kind,related_capsule_id,created_at FROM hrm_knowledge_capsule_events');
-    }
-
-    private function capsuleEventColumnExists(string $column): bool
-    {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
-        $stmt->execute(['hrm_knowledge_capsule_events', $column]);
-        return (int) $stmt->fetchColumn() === 1;
-    }
-
-    private function capsuleEventIndexExists(string $index): bool
-    {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?');
-        $stmt->execute(['hrm_knowledge_capsule_events', $index]);
-        return (int) $stmt->fetchColumn() > 0;
     }
 
     private function validStoredCapsule(array $capsule, string $expectedId): bool
