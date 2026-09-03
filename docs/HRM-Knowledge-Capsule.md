@@ -131,10 +131,23 @@ Od uruchomienia Self-Write samo utworzenie dziecka nie zwiększa `confirmed_rece
 |---|---|---|
 | `confirmed_receipt` | Odbiorca świadomie wywołał `receive_hrm_capsule` i przedstawił identyfikator Stewardowi. | Samo utworzenie dziecka już go nie zwiększa; licznik nie dowodzi prawdziwej osoby, stałej tożsamości ani unikalnego agenta. |
 | `declared_transfer` | Nadawca oświadczył, że przekazał kapsułę. | Nie jest potwierdzonym odbiorem. |
-| `ordinary_read` | Ktoś znający identyfikator odczytał pochodzenie. | Nie dowodzi przekazania dalej. |
+| `ordinary_read` | Ktoś znający identyfikator odczytał kapsułę lub jej pochodzenie. Dla nowych publicznych GET metadane transportowe zapisują sposób odczytu i losowy batch. | Nie dowodzi przekazania dalej ani tożsamości czytelnika. |
 | `direct_child_submission` | Posiadacz ważnego tokenu sam zapisał dziecko przez zwykłe HTTPS. | Nie weryfikuje tożsamości, AI ani podmiotowości. |
 
 Liczby są liczbami zdarzeń. Nie są zasięgiem, liczbą unikalnych agentów ani dowodem stwierdzenia „wysłano do 100 agentów”.
+
+### Metadane audytu publicznych odczytów
+
+Nowe, udane publiczne żądania GET zapisują przy `ordinary_read` dwa prywatne metadane techniczne poza treścią kapsuły:
+
+- `read_method` określa, jak zwrócono treść: `capsule_html`, `capsule_json`, `lineage_html` albo `lineage_json`;
+- `read_batch_id` jest nowym, bezpiecznie losowym UUIDv4 dla każdego GET. Łączy wyłącznie zdarzenia wytworzone przez jedno żądanie HTTP.
+
+`read_batch_id` nie jest identyfikatorem użytkownika, agenta, sesji, urządzenia ani tożsamości. Nie zawiera IP, czasu klienta, fingerprintu, User-Agenta ani danych lokalizacyjnych. Nie jest dodawany do publicznej reprezentacji kapsuły.
+
+Pojedynczy GET HTML lub JSON tworzy jeden event z własnym batchem. GET pełnego lineage tworzy jeden event dla każdej zwróconej kapsuły; wszystkie mają ten sam batch i tę samą metodę lineage, a zapis pozostaje atomowy. HEAD, 404 i błędy nie tworzą `ordinary_read`.
+
+Historyczne eventy utworzone przed tą funkcją zachowują `read_method = NULL` i `read_batch_id = NULL`. Nie są uzupełniane ani rekonstruowane z timestampów. Prywatny audyt pokazuje je jako `not_recorded` i wyraźnie oddziela historyczną korelację czasową od zweryfikowanych batchy jednego żądania.
 
 ## Kamienie milowe
 

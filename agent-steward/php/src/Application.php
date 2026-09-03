@@ -274,7 +274,12 @@ final class Application
             ? json_encode($publicCapsule, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             : $this->capsulePage($capsule);
         if ($request->method === 'GET') {
-            $this->store->recordKnowledgeCapsuleEvent($capsuleId, 'ordinary_read', null, $this->now());
+            $this->store->recordKnowledgeCapsuleRead(
+                $capsuleId,
+                $this->now(),
+                $json ? 'capsule_json' : 'capsule_html',
+                uuidV4($this->randomBytes),
+            );
         }
         return new Response(200, $body, $headers);
     }
@@ -311,7 +316,12 @@ final class Application
             : $this->lineagePage($payload);
         if ($request->method === 'GET') {
             try {
-                $this->store->recordKnowledgeCapsuleReads(array_column($capsules, 'capsule_id'), $this->now());
+                $this->store->recordKnowledgeCapsuleReads(
+                    array_column($capsules, 'capsule_id'),
+                    $this->now(),
+                    $json ? 'lineage_json' : 'lineage_html',
+                    uuidV4($this->randomBytes),
+                );
             } catch (Throwable) {
                 return $this->incompleteLineage($capsuleId, 'read_recording_failed', $json, $requestId);
             }

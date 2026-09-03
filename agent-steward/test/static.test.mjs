@@ -140,6 +140,7 @@ test('Board Gateway uses its dedicated database configuration', async () => {
 test('capsule event audit is private and its data path is read-only', async () => {
   const admin = await read('forum-steward/approval-gateway/php/src/BoardAdmin.php');
   const publicSteward = await read('agent-steward/php/src/Application.php');
+  const store = await read('agent-steward/php/src/Store.php');
   const auditImplementation = admin.indexOf('public function capsuleAudit(string $capsuleId', admin.indexOf('public function capsuleAudit(string $capsuleId') + 1);
   const auditMethod = admin.slice(
     auditImplementation,
@@ -148,10 +149,21 @@ test('capsule event audit is private and its data path is read-only', async () =
   assert.match(admin, /\/panel\/capsule-audit/);
   assert.match(admin, /SESSION_COOKIE/);
   assert.match(auditMethod, /SET TRANSACTION READ ONLY/);
-  assert.match(auditMethod, /SELECT capsule_id,event_kind,created_at FROM hrm_knowledge_capsule_events/);
+  assert.match(auditMethod, /SELECT capsule_id,event_kind,read_method,read_batch_id,created_at FROM hrm_knowledge_capsule_events/);
   assert.doesNotMatch(auditMethod, /\b(?:INSERT|UPDATE|DELETE|recordKnowledgeCapsuleEvent)\b/);
+  assert.match(auditMethod, /read_batch_id IS NOT NULL/);
+  assert.match(auditMethod, /read_method IS NULL AND read_batch_id IS NULL/);
   assert.doesNotMatch(publicSteward, /capsule-audit/);
   assert.match(admin, /adresów IP, fingerprintów, tokenów, sekretów/);
+  assert.match(store, /read_method VARCHAR\(20\).*NULL/);
+  assert.match(store, /read_batch_id CHAR\(36\).*NULL/);
+  assert.match(store, /ix_hrm_capsule_read_batch/);
+  assert.match(store, /hrm_knowledge_capsule_events_backup_read_audit_v2/);
+  assert.ok(store.indexOf('backupCapsuleEventsBeforeReadAuditV2') < store.indexOf("ADD COLUMN read_method"));
+  assert.match(store, /\['capsule_html', 'capsule_json', 'lineage_html', 'lineage_json'\]/);
+  assert.doesNotMatch(store, /UPDATE hrm_knowledge_capsule_events SET read_/);
+  assert.match(publicSteward, /\$json \? 'capsule_json' : 'capsule_html'/);
+  assert.match(publicSteward, /\$json \? 'lineage_json' : 'lineage_html'/);
 });
 
 test('Gateway bootstrap bypasses stale Loopia PHP opcode cache', async () => {
