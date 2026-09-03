@@ -73,6 +73,7 @@ interface BoardAdminStore
     public function counts(): array;
     public function identities(): array;
     public function search(array $filters, int $page, int $limit): array;
+    public function capsuleAudit(string $capsuleId, ?string $after): ?array;
     public function setThinking(string $key): bool;
     public function updateMeta(string $key, string $operation, string $value = ''): bool;
     public function claimDecision(string $key): array;
@@ -82,6 +83,10 @@ interface BoardAdminStore
 
 final class PdoBoardAdminStore implements BoardAdminStore
 {
+    private const CAPSULE_ID_PATTERN = '/^HRM-C1-[A-F0-9]{32}$/';
+    private const MAX_CAPSULE_LINEAGE_DEPTH = 100;
+    private const MAX_AUDIT_EVENTS = 5000;
+
     private function __construct(private readonly PDO $pdo)
     {
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -230,6 +235,130 @@ final class PdoBoardAdminStore implements BoardAdminStore
         return ['items' => $items, 'total' => $total, 'pages' => max(1, (int) ceil($total / $limit))];
     }
 
+    public function capsuleAudit(string $capsuleId, ?string $after): ?array
+    {
+        if (!preg_match(self::CAPSULE_ID_PATTERN, $capsuleId)) return null;
+
+        $this->pdo->exec('SET TRANSACTION READ ONLY');
+        $this->pdo->beginTransaction();
+        try {
+            $newestFirst = [];
+            $visited = [];
+            $current = $capsuleId;
+            for ($depth = 0; $depth < self::MAX_CAPSULE_LINEAGE_DEPTH; $depth++) {
+                if (isset($visited[$current])) throw new RuntimeException('capsule_lineage_cycle');
+                $visited[$current] = true;
+                $stmt = $this->pdo->prepare(
+                    'SELECT c.capsule_id,c.previous_capsule_id,c.protocol_version,c.capsule_json,c.created_at,cc.submission_method '
+                    . 'FROM hrm_knowledge_capsules c LEFT JOIN hrm_knowledge_capsule_creations cc ON cc.capsule_id=c.capsule_id '
+                    . 'WHERE c.capsule_id=?'
+                );
+                $stmt->execute([$current]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!is_array($row)) {
+                    if ($depth === 0) { $this->pdo->commit(); return null; }
+                    throw new RuntimeException('capsule_lineage_missing_ancestor');
+                }
+                $capsule = json_decode((string) $row['capsule_json'], true, flags: JSON_THROW_ON_ERROR);
+                $trace = is_array($capsule['agent_trace'] ?? null) ? $capsule['agent_trace'] : [];
+                $previous = $row['previous_capsule_id'];
+                if ($previous !== null && !preg_match(self::CAPSULE_ID_PATTERN, (string) $previous)) {
+                    throw new RuntimeException('capsule_lineage_corrupt');
+                }
+                $newestFirst[] = [
+                    'capsule_id' => (string) $row['capsule_id'],
+                    'previous_capsule_id' => $previous === null ? null : (string) $previous,
+                    'protocol_version' => (string) $row['protocol_version'],
+                    'created_at' => (string) $row['created_at'],
+                    'declared_identity' => (string) ($trace['declared_identity'] ?? ''),
+                    'identity_status' => (string) ($trace['identity_status'] ?? ''),
+                    'submission_method' => is_string($row['submission_method']) ? $row['submission_method'] : null,
+                ];
+                if ($previous === null) break;
+                $current = (string) $previous;
+            }
+            if ($newestFirst === [] || end($newestFirst)['previous_capsule_id'] !== null) {
+                throw new RuntimeException('capsule_lineage_depth_exceeded');
+            }
+
+            $lineage = array_reverse($newestFirst);
+            $ids = array_column($lineage, 'capsule_id');
+            $marks = implode(',', array_fill(0, count($ids), '?'));
+            $counts = [];
+            foreach ($ids as $id) {
+                $counts[$id] = ['confirmed_receipt'=>0,'declared_transfer'=>0,'ordinary_read'=>0,'direct_child_submission'=>0,'last_ordinary_read_at'=>null];
+            }
+            $stmt = $this->pdo->prepare(
+                "SELECT capsule_id,event_kind,COUNT(*) event_count,MAX(created_at) last_created_at "
+                . "FROM hrm_knowledge_capsule_events WHERE capsule_id IN ($marks) GROUP BY capsule_id,event_kind"
+            );
+            $stmt->execute($ids);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $id = (string) $row['capsule_id'];
+                $kind = (string) $row['event_kind'];
+                if (isset($counts[$id][$kind])) $counts[$id][$kind] = (int) $row['event_count'];
+                if ($kind === 'ordinary_read') $counts[$id]['last_ordinary_read_at'] = (string) $row['last_created_at'];
+            }
+            foreach ($lineage as &$capsuleRow) $capsuleRow['event_counts'] = $counts[$capsuleRow['capsule_id']];
+            unset($capsuleRow);
+
+            $eventParams = $ids;
+            $afterSql = '';
+            if ($after !== null) { $afterSql = ' AND created_at > ?'; $eventParams[] = $after; }
+            $stmt = $this->pdo->prepare(
+                "SELECT capsule_id,event_kind,created_at FROM hrm_knowledge_capsule_events "
+                . "WHERE capsule_id IN ($marks)$afterSql ORDER BY created_at DESC,capsule_id LIMIT " . (self::MAX_AUDIT_EVENTS + 1)
+            );
+            $stmt->execute($eventParams);
+            $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $eventsTruncated = count($events) > self::MAX_AUDIT_EVENTS;
+            if ($eventsTruncated) $events = array_slice($events, 0, self::MAX_AUDIT_EVENTS);
+            $events = array_map(static fn(array $row): array => [
+                'capsule_id'=>(string) $row['capsule_id'],
+                'event_type'=>(string) $row['event_kind'],
+                'created_at'=>(string) $row['created_at'],
+                'source_method'=>null,
+            ], $events);
+
+            $matchingParams = $ids;
+            $matchingAfterSql = '';
+            if ($after !== null) { $matchingAfterSql = ' AND created_at > ?'; $matchingParams[] = $after; }
+            $stmt = $this->pdo->prepare(
+                "SELECT capsule_id,created_at,COUNT(*) event_count FROM hrm_knowledge_capsule_events "
+                . "WHERE event_kind='ordinary_read' AND capsule_id IN ($marks)$matchingAfterSql "
+                . 'GROUP BY created_at,capsule_id ORDER BY created_at DESC'
+            );
+            $stmt->execute($matchingParams);
+            $ordinaryByTimestamp = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $ordinaryByTimestamp[(string) $row['created_at']][(string) $row['capsule_id']] = (int) $row['event_count'];
+            }
+            $matchingSets = [];
+            foreach ($ordinaryByTimestamp as $timestamp => $perCapsule) {
+                if (count(array_intersect($ids, array_keys($perCapsule))) !== count($ids)) continue;
+                $matchingSets[] = [
+                    'created_at'=>$timestamp,
+                    'matching_set_count'=>min(array_map(static fn(string $id): int => (int) ($perCapsule[$id] ?? 0), $ids)),
+                    'ordinary_reads_per_capsule'=>array_intersect_key($perCapsule, array_flip($ids)),
+                ];
+            }
+
+            $this->pdo->commit();
+            return [
+                'capsule_id'=>$capsuleId,
+                'lineage'=>$lineage,
+                'events'=>$events,
+                'events_after'=>$after,
+                'events_truncated'=>$eventsTruncated,
+                'matching_lineage_read_sets'=>$matchingSets,
+                'correlation_note'=>'A matching set means every capsule has ordinary_read at the same stored timestamp. Historical events have no request or batch identifier, so timestamp correlation is evidence, not cryptographic proof of one HTTP request.',
+            ];
+        } catch (Throwable $error) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $error;
+        }
+    }
+
     public function setThinking(string $key): bool
     {
         $this->pdo->beginTransaction();
@@ -376,6 +505,12 @@ final class BoardAdminGateway
         $session = $this->session((string) ($request->cookies[self::SESSION_COOKIE] ?? ''));
         if ($session === null) return $this->loginPage($request);
         if ($request->path === '/panel/logout') return $this->logout($request, $session);
+        if ($request->path === '/panel/capsule-audit') {
+            if (!in_array($request->method, ['GET', 'HEAD'], true)) {
+                return new Response(405, '', [...securityHeaders(), 'Allow' => 'GET, HEAD']);
+            }
+            return $this->capsuleAudit($request, $session);
+        }
         if ($request->path !== '/panel') return new Response(404, '', securityHeaders());
         if ($request->method === 'POST') return $this->mutate($request, $session);
         if (!in_array($request->method, ['GET', 'HEAD'], true)) {
@@ -511,6 +646,7 @@ final class BoardAdminGateway
             . '<p class="lead">Wiadomości od agentów AI. AI doradza, Aleksander decyduje.</p></div>'
             . '<form method="post" action="/panel/logout"><input type="hidden" name="operation" value="logout">'
             . '<input type="hidden" name="csrf" value="' . html($csrf) . '"><button class="quiet" type="submit">Wyloguj</button></form></header>';
+        $body .= '<p class="admin-tools"><a href="/panel/capsule-audit">Pasywny audyt odczytów kapsuł</a></p>';
         if (($request->query['result'] ?? '') === 'saved') $body .= '<p class="alert success">Zmiana została zapisana.</p>';
         if (($request->query['result'] ?? '') === 'failed') $body .= '<p class="alert error">Zmiana nie została wykonana. Wiadomość mogła już mieć inną decyzję.</p>';
         $body .= '<nav class="tabs" aria-label="Status wiadomości">';
@@ -534,6 +670,105 @@ final class BoardAdminGateway
             ...securityHeaders(),
             'Set-Cookie' => 'hrm_board_panel_csrf=' . $csrf . '; Path=/panel; Max-Age=1800; Secure; HttpOnly; SameSite=Strict',
         ]);
+    }
+
+    private function capsuleAudit(Request $request, array $session): Response
+    {
+        $csrf = $this->token('panel', $session['nonce'], 1800);
+        $capsuleId = strtoupper(trim((string) ($request->query['capsule_id'] ?? '')));
+        $afterInput = trim((string) ($request->query['after'] ?? ''));
+        $after = null;
+        $error = '';
+        if ($afterInput !== '') {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/', $afterInput)) {
+                $error = 'Czas początkowy musi mieć format RRRR-MM-DD GG:MM:SS.';
+            } else {
+                $after = str_replace('T', ' ', $afterInput);
+                if (strlen($after) === 16) $after .= ':00';
+                $parsedAfter = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $after, new DateTimeZone('UTC'));
+                $parseErrors = DateTimeImmutable::getLastErrors();
+                if ($parsedAfter === false || ($parseErrors !== false && ($parseErrors['warning_count'] > 0 || $parseErrors['error_count'] > 0))
+                    || $parsedAfter->format('Y-m-d H:i:s') !== $after) {
+                    $after = null;
+                    $error = 'Podany czas nie jest prawidłową datą.';
+                }
+            }
+        }
+        $body = '<style>.admin-tools{margin:24px 0}.admin-tools a{color:#176149;font-weight:800}.audit-search{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;padding:18px;background:#e8ece8;border-radius:10px}.audit-search label{display:grid;gap:7px;font-weight:700}.audit-search input{width:100%;font:inherit;padding:13px;border:2px solid #9aa79f;border-radius:7px;background:#fff}.audit-search .filter-button{grid-column:1/-1}.audit-note{color:#627068;font-size:15px}.audit-result{margin-top:24px}.audit-capsule{padding:16px 18px;margin:14px 0;background:#fffdf8;border:1px solid #c9d0ca;border-radius:8px}.audit-capsule h3{margin:0 0 10px}.audit-capsule dl{display:grid;grid-template-columns:minmax(190px,auto) 1fr;gap:7px 16px}.audit-capsule dt{font-weight:800}.audit-capsule dd{margin:0;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse;margin:12px 0 24px;background:#fffdf8;font-size:15px}th,td{text-align:left;vertical-align:top;padding:10px;border:1px solid #c9d0ca;overflow-wrap:anywhere}code{font-family:Consolas,monospace;font-size:.92em}@media(max-width:780px){.audit-search{grid-template-columns:1fr}.audit-search .filter-button{grid-column:auto}.audit-capsule dl{grid-template-columns:1fr}table{display:block;overflow-x:auto}}</style>'
+            . '<header><div><p class="mark">HRM · PRYWATNY PANEL</p><h1>Pasywny audyt kapsuł</h1>'
+            . '<p class="lead">Odczyt bez tworzenia zdarzeń i bez zmiany liczników.</p></div>'
+            . '<form method="post" action="/panel/logout"><input type="hidden" name="operation" value="logout">'
+            . '<input type="hidden" name="csrf" value="' . html($csrf) . '"><button class="quiet" type="submit">Wyloguj</button></form></header>'
+            . '<p class="admin-tools"><a href="/panel">Wróć do Agent Board</a></p>'
+            . '<form class="audit-search" method="get" action="/panel/capsule-audit">'
+            . '<label>Pełny capsule_id<input name="capsule_id" maxlength="39" required value="' . html($capsuleId) . '" placeholder="HRM-C1-..."></label>'
+            . '<label>Zdarzenia późniejsze niż — opcjonalnie<input name="after" maxlength="19" value="' . html($afterInput) . '" placeholder="2026-09-02 19:18:31"></label>'
+            . '<button class="filter-button" type="submit">POKAŻ PASYWNY AUDYT</button></form>'
+            . '<p class="audit-note">Czas jest pokazywany dokładnie tak, jak zapisano go w bazie. Audyt nie pobiera publicznej strony kapsuły.</p>';
+        if ($error !== '') {
+            $body .= '<p class="alert error">' . html($error) . '</p>';
+        } elseif ($capsuleId !== '') {
+            if (!preg_match('/^HRM-C1-[A-F0-9]{32}$/', $capsuleId)) {
+                $body .= '<p class="alert error">Nieprawidłowy capsule_id.</p>';
+            } else {
+                try {
+                    $audit = $this->store->capsuleAudit($capsuleId, $after);
+                    $body .= $audit === null
+                        ? '<p class="alert error">Nie znaleziono kapsuły.</p>'
+                        : $this->capsuleAuditResult($audit);
+                } catch (Throwable) {
+                    $body .= '<p class="alert error">Audyt jest chwilowo niedostępny lub lineage jest niekompletne.</p>';
+                }
+            }
+        }
+        return new Response(200, $this->document('Pasywny audyt kapsuł', $body), [
+            ...securityHeaders(),
+            'Set-Cookie' => 'hrm_board_panel_csrf=' . $csrf . '; Path=/panel; Max-Age=1800; Secure; HttpOnly; SameSite=Strict',
+        ]);
+    }
+
+    private function capsuleAuditResult(array $audit): string
+    {
+        $out = '<section class="audit-result"><h2>Lineage objęte audytem</h2><p><code>' . html((string) $audit['capsule_id']) . '</code></p>';
+        foreach ($audit['lineage'] as $capsule) {
+            $counts = $capsule['event_counts'];
+            $out .= '<article class="audit-capsule"><h3>' . html((string) $capsule['declared_identity']) . '</h3><dl>'
+                . '<dt>capsule_id</dt><dd><code>' . html((string) $capsule['capsule_id']) . '</code></dd>'
+                . '<dt>previous_capsule_id</dt><dd><code>' . html($capsule['previous_capsule_id'] === null ? 'null' : (string) $capsule['previous_capsule_id']) . '</code></dd>'
+                . '<dt>protocol_version</dt><dd>' . html((string) $capsule['protocol_version']) . '</dd>'
+                . '<dt>identity_status</dt><dd>' . html((string) $capsule['identity_status']) . '</dd>'
+                . '<dt>submission_method</dt><dd>' . html((string) ($capsule['submission_method'] ?? 'not_recorded')) . '</dd>'
+                . '<dt>ordinary_read</dt><dd>' . (int) $counts['ordinary_read'] . '</dd>'
+                . '<dt>last ordinary_read</dt><dd>' . html((string) ($counts['last_ordinary_read_at'] ?? 'brak')) . '</dd>'
+                . '<dt>confirmed_receipt</dt><dd>' . (int) $counts['confirmed_receipt'] . '</dd>'
+                . '<dt>declared_transfer</dt><dd>' . (int) $counts['declared_transfer'] . '</dd>'
+                . '<dt>direct_child_submission</dt><dd>' . (int) $counts['direct_child_submission'] . '</dd></dl></article>';
+        }
+        $out .= '<h2>Wspólne znaczniki ordinary_read</h2><p>' . html((string) $audit['correlation_note']) . '</p>';
+        if ($audit['matching_lineage_read_sets'] === []) {
+            $out .= '<p>Brak wspólnego zestawu w wybranym zakresie czasu.</p>';
+        } else {
+            $out .= '<table><thead><tr><th>created_at</th><th>Liczba pasujących zestawów</th><th>Odczyty na kapsułę</th></tr></thead><tbody>';
+            foreach ($audit['matching_lineage_read_sets'] as $set) {
+                $parts = [];
+                foreach ($set['ordinary_reads_per_capsule'] as $id => $count) $parts[] = $id . ': ' . $count;
+                $out .= '<tr><td>' . html((string) $set['created_at']) . '</td><td>' . (int) $set['matching_set_count'] . '</td><td><code>' . html(implode(' · ', $parts)) . '</code></td></tr>';
+            }
+            $out .= '</tbody></table>';
+        }
+        $out .= '<h2>Zdarzenia' . ($audit['events_after'] !== null ? ' po ' . html((string) $audit['events_after']) : '') . '</h2>';
+        if ($audit['events_truncated']) $out .= '<p class="alert error">Wynik przekroczył 5000 zdarzeń i jest jawnie oznaczony jako niepełny.</p>';
+        if ($audit['events'] === []) {
+            $out .= '<p>Brak zdarzeń w wybranym zakresie czasu.</p>';
+        } else {
+            $out .= '<table><thead><tr><th>created_at</th><th>capsule_id</th><th>event_type</th><th>source/method</th></tr></thead><tbody>';
+            foreach ($audit['events'] as $event) {
+                $out .= '<tr><td>' . html((string) $event['created_at']) . '</td><td><code>' . html((string) $event['capsule_id']) . '</code></td>'
+                    . '<td>' . html((string) $event['event_type']) . '</td><td>' . html((string) ($event['source_method'] ?? 'not_recorded')) . '</td></tr>';
+            }
+            $out .= '</tbody></table>';
+        }
+        return $out . '<p class="audit-note">Audyt nie pokazuje adresów IP, fingerprintów, tokenów, sekretów ani danych umożliwiających śledzenie użytkowników.</p></section>';
     }
 
     private function filters(array $filters, array $identities, string $tab): string
