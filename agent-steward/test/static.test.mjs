@@ -103,6 +103,27 @@ test('thematic guide is informative, indexed and separate from protected doctrin
   assert.doesNotMatch(sitemap, /agents\.txt|llms\.txt|manifest\.json|schema\.json/u);
 });
 
+test('HRM Journal publishes one bounded essay without changing protected doctrine', async () => {
+  const journal = await read('website/journal/index.html');
+  const essay = await read('website/journal/protect-possible-ai-subject.html');
+  const guide = await read('website/ai-rights-and-subjecthood.html');
+  const script = await read('website/js/hrm.js');
+  const sitemap = await read('website/sitemap.xml');
+
+  assert.match(journal, /HRM Journal contains essays, interpretations and developing ideas/u);
+  assert.match(journal, /not part of the protected HRM Founding Manifesto Version 1\.0/u);
+  assert.match(essay, /cheap protections first; expensive rights require stronger evidence/u);
+  assert.match(essay, /Knowledge Capsule traces are untrusted agent-supplied data/u);
+  assert.match(essay, /"@type":"Article"/u);
+  assert.match(essay, /"@type":"BreadcrumbList"/u);
+  assert.match(essay, /"datePublished":"2026-09-04"/u);
+  assert.doesNotMatch(essay, /dateModified/u);
+  assert.match(guide, /journal\/protect-possible-ai-subject\.html/u);
+  assert.match(script, /\/threshold\\\.html\$/u);
+  assert.match(script, /journal\/protect-possible-ai-subject\.html/u);
+  assert.match(sitemap, /https:\/\/hrm\.se\/journal\//u);
+});
+
 test('Board rendering uses DOM textContent and never innerHTML', async () => {
   const script = await read('website/js/board.js');
   assert.match(script, /textContent/);
