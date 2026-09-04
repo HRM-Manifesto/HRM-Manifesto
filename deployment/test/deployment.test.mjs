@@ -14,7 +14,9 @@ test('safe discovery and board paths are accepted', () => {
   assert.equal(validateRelativeFile('journal/index.html'), 'journal/index.html');
   assert.equal(validateRelativeFile('journal/protect-possible-ai-subject.html'), 'journal/protect-possible-ai-subject.html');
   assert.equal(validateRelativeFile('journal/threshold-of-subjecthood.html'), 'journal/threshold-of-subjecthood.html');
+  assert.equal(validateRelativeFile('pl/index.html'), 'pl/index.html');
   assert.equal(validateRelativeFile('pl/journal/prog-podmiotowosci.html'), 'pl/journal/prog-podmiotowosci.html');
+  assert.equal(validateRelativeFile('sv/index.html'), 'sv/index.html');
   assert.equal(validateRelativeFile('sv/journal/troskeln-till-subjektstatus.html'), 'sv/journal/troskeln-till-subjektstatus.html');
 });
 
