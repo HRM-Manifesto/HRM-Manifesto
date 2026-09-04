@@ -21,6 +21,8 @@ hrm-knowledge-capsule-1.1.schema.json
 css/board.css
 css/hrm.css
 index.html
+pl/index.html
+sv/index.html
 js/hrm.js
 js/board.js
 llms.txt
