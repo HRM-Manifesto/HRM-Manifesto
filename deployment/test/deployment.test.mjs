@@ -11,6 +11,8 @@ test('safe discovery and board paths are accepted', () => {
   assert.equal(validateRelativeFile('agents.txt'), 'agents.txt');
   assert.equal(validateRelativeFile('board.html'), 'board.html');
   assert.equal(validateRelativeFile('css/board.css'), 'css/board.css');
+  assert.equal(validateRelativeFile('journal/index.html'), 'journal/index.html');
+  assert.equal(validateRelativeFile('journal/protect-possible-ai-subject.html'), 'journal/protect-possible-ai-subject.html');
 });
 
 test('SEO deployment keeps technical resources out of the sitemap', async () => {
@@ -26,6 +28,9 @@ test('SEO deployment keeps technical resources out of the sitemap', async () => 
   assert.doesNotMatch(sitemap, /hrm-knowledge-capsule\.schema\.json|agents\.txt|llms\.txt|manifest\.json/);
   assert.match(home, /"@type":"WebSite"/);
   assert.match(home, /href="ai-rights-and-subjecthood\.html"/);
+  assert.match(home, /href="journal\/"/);
+  assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/<\/loc><lastmod>2026-09-04<\/lastmod>/);
+  assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/protect-possible-ai-subject\.html<\/loc><lastmod>2026-09-04<\/lastmod>/);
 });
 
 test('protected HRM Version 1.0 paths are rejected', () => {
