@@ -1,5 +1,4 @@
 # Paths are relative to website/. Only reviewed, non-doctrinal public files belong here.
-.htaccess
 agents.html
 agents.md
 agents.txt
