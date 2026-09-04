@@ -99,7 +99,8 @@ test('thematic guide is informative, indexed and separate from protected doctrin
   }
   assert.match(guide, /not part of the protected HRM Founding Manifesto Version 1\.0/u);
   assert.match(sitemap, /https:\/\/hrm\.se\/ai-rights-and-subjecthood\.html/u);
-  assert.match(sitemap, /https:\/\/hrm\.se\/agents\.txt/u);
+  assert.match(sitemap, /https:\/\/hrm\.se\/agents\.html/u);
+  assert.doesNotMatch(sitemap, /agents\.txt|llms\.txt|manifest\.json|schema\.json/u);
 });
 
 test('Board rendering uses DOM textContent and never innerHTML', async () => {
