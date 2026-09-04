@@ -95,3 +95,48 @@ test('article translations preserve distinctions, cross-links and interpretation
   assert.match(firstPl, /HRM nie rozwiązuje tej niepewności przez uznanie każdej sztucznej inteligencji za podmiot/iu);
   assert.match(firstSv, /HRM löser inte denna osäkerhet genom att förklara varje artificiell intelligens som ett subjekt/iu);
 });
+
+test('all Journal pages invite submissions without promising publication or adding a form', async () => {
+  const copy = {
+    en: ['Have an idea or essay for HRM Journal?', 'Send your article for consideration to:'],
+    pl: ['Masz pomysł lub tekst, który powinien znaleźć się w HRM Journal?', 'Wyślij artykuł do rozpatrzenia na:'],
+    sv: ['Har du en idé eller essä för HRM Journal?', 'Skicka din artikel för granskning till:'],
+  };
+  for (const family of families) {
+    for (const language of ['en', 'pl', 'sv']) {
+      const html = await readFile(toFile(family[language]), 'utf8');
+      assert.equal(matches(html, /class="journal-submission"/gu).length, 1, family[language]);
+      assert.ok(html.includes(copy[language][0]), `${family[language]} heading`);
+      assert.ok(html.includes(copy[language][1]), `${family[language]} explanation`);
+      assert.ok(html.includes('href="mailto:manifest@hrm.se?subject=HRM%20Journal%20submission"'), `${family[language]} mailto`);
+      assert.ok(html.indexOf('class="journal-submission"') < html.indexOf('</main>'), `${family[language]} before footer`);
+      assert.doesNotMatch(html, /<form\b/iu, family[language]);
+    }
+  }
+});
+
+test('home page Journal panel is localized, accessible and responsive without popups', async () => {
+  const script = await readFile(path.join(website, 'js', 'hrm.js'), 'utf8');
+  const css = await readFile(path.join(website, 'css', 'hrm.css'), 'utf8');
+  for (const pathName of ['/', '/index.html', '/pl/', '/pl/index.html', '/sv/', '/sv/index.html']) {
+    assert.ok(script.includes(`"${pathName}"`), pathName);
+  }
+  for (const phrase of ['Latest essays', 'Najnowsze eseje', 'Senaste essäerna', 'View all articles →', 'Zobacz wszystkie artykuły →', 'Se alla artiklar →']) {
+    assert.ok(script.includes(phrase), phrase);
+  }
+  for (const family of families.slice(1)) {
+    for (const language of ['en', 'pl', 'sv']) assert.ok(script.includes(family[language].split('/').at(-1)), family[language]);
+  }
+  assert.match(script, /panel\.setAttribute\("aria-labelledby", "homepage-journal-title"\)/u);
+  assert.match(script, /document\.createElement\("a"\)/u);
+  assert.doesNotMatch(script, /innerHTML|window\.open|<dialog|modal/iu);
+  assert.match(css, /\.journal-panel-list[\s\S]*?max-height:[\s\S]*?overflow-y: auto/u);
+  assert.match(css, /@media \(max-width: 68rem\)[\s\S]*?\.hero-journal-layout[\s\S]*?grid-template-columns: 1fr/u);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/u);
+
+  for (const homepage of ['index.html', 'pl/index.html', 'sv/index.html']) {
+    const html = await readFile(path.join(website, ...homepage.split('/')), 'utf8');
+    assert.equal(matches(html, /<h1\b/gu).length, 1, homepage);
+    assert.match(html, /<script src="(?:\.\.\/)?js\/hrm\.js" defer><\/script>/u);
+  }
+});

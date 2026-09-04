@@ -267,6 +267,75 @@ p {
   width: min(100%, var(--wide));
 }
 
+.hero-journal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+  align-items: center;
+  gap: clamp(2.5rem, 5vw, 5rem);
+}
+
+.hero-journal-primary {
+  min-width: 0;
+}
+
+.journal-panel {
+  padding: clamp(1.4rem, 2.5vw, 2rem);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.journal-panel-label,
+.journal-panel-category {
+  margin: 0;
+  color: var(--metal);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.journal-panel h2 {
+  margin: 0.45rem 0 1.4rem;
+  font-size: clamp(1.8rem, 3vw, 2.7rem);
+}
+
+.journal-panel-list {
+  max-height: 23rem;
+  overflow-y: auto;
+  scrollbar-color: var(--metal) transparent;
+  scrollbar-width: thin;
+}
+
+.journal-panel-entry {
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.journal-panel-entry h3 {
+  margin: 0.45rem 0 0.6rem;
+  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
+  line-height: 1.25;
+}
+
+.journal-panel-entry h3 a {
+  text-decoration: none;
+}
+
+.journal-panel-entry time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.journal-panel-all {
+  display: inline-block;
+  margin-top: 1.3rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
 .hero h1 {
   margin: 0;
   letter-spacing: 0.08em;
@@ -610,6 +679,31 @@ p {
   border-top: 1px solid var(--line);
 }
 
+.journal-submission {
+  padding: clamp(3.5rem, 7vw, 6rem) 1.25rem;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.journal-submission h2 {
+  max-width: 20ch;
+  margin-bottom: 1.25rem;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+}
+
+.journal-submission p {
+  max-width: 42rem;
+}
+
+.journal-submission-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  color: var(--metal);
+  font-family: var(--serif);
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+}
+
 .contact-note p {
   margin-bottom: 0.35rem;
   font-family: var(--serif);
@@ -873,6 +967,15 @@ p {
 }
 
 @media (max-width: 68rem) {
+  .hero-journal-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .journal-panel {
+    width: 100%;
+    margin-top: 1rem;
+  }
+
   .menu-button {
     display: grid;
     place-items: center;
@@ -1048,6 +1151,10 @@ p {
 
   .agent-caveat {
     padding-left: 1rem;
+  }
+
+  .journal-panel {
+    padding: 1.25rem;
   }
 }
 
