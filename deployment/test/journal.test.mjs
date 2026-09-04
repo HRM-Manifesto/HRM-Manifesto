@@ -137,6 +137,7 @@ test('home page Journal panel is localized, accessible and responsive without po
   for (const homepage of ['index.html', 'pl/index.html', 'sv/index.html']) {
     const html = await readFile(path.join(website, ...homepage.split('/')), 'utf8');
     assert.equal(matches(html, /<h1\b/gu).length, 1, homepage);
-    assert.match(html, /<script src="(?:\.\.\/)?js\/hrm\.js" defer><\/script>/u);
+    assert.match(html, /<script src="(?:\.\.\/)?js\/hrm\.js\?v=20260904-journal" defer><\/script>/u);
+    assert.match(html, /<link rel="stylesheet" href="(?:\.\.\/)?css\/hrm\.css\?v=20260904-journal">/u);
   }
 });
