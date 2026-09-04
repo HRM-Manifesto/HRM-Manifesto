@@ -8,9 +8,29 @@ test('allowlist parser ignores comments and blank lines', () => {
 });
 
 test('safe discovery and board paths are accepted', () => {
+  assert.equal(validateRelativeFile('.htaccess'), '.htaccess');
   assert.equal(validateRelativeFile('agents.txt'), 'agents.txt');
   assert.equal(validateRelativeFile('board.html'), 'board.html');
   assert.equal(validateRelativeFile('css/board.css'), 'css/board.css');
+});
+
+test('SEO deployment uses one canonical host and keeps technical resources out of the sitemap', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const redirect = await readFile(path.join(root, 'website', '.htaccess'), 'utf8');
+  const sitemap = await readFile(path.join(root, 'website', 'sitemap.xml'), 'utf8');
+  const robots = await readFile(path.join(root, 'website', 'robots.txt'), 'utf8');
+  const home = await readFile(path.join(root, 'website', 'index.html'), 'utf8');
+
+  assert.match(redirect, /RewriteCond %\{HTTPS\} !=on/);
+  assert.match(redirect, /RewriteCond %\{HTTP_HOST\} !\^hrm\\\.se\$/);
+  assert.match(redirect, /https:\/\/hrm\.se%\{REQUEST_URI\}/);
+  assert.match(robots, /Sitemap: https:\/\/hrm\.se\/sitemap\.xml/);
+  assert.match(sitemap, /<loc>https:\/\/hrm\.se\/ai-rights-and-subjecthood\.html<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+  assert.doesNotMatch(sitemap, /hrm-knowledge-capsule\.schema\.json|agents\.txt|llms\.txt|manifest\.json/);
+  assert.match(home, /"@type":"WebSite"/);
+  assert.match(home, /href="ai-rights-and-subjecthood\.html"/);
 });
 
 test('protected HRM Version 1.0 paths are rejected', () => {
