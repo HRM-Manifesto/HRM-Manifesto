@@ -103,7 +103,7 @@ test('thematic guide is informative, indexed and separate from protected doctrin
   assert.doesNotMatch(sitemap, /agents\.txt|llms\.txt|manifest\.json|schema\.json/u);
 });
 
-test('HRM Journal publishes one bounded essay without changing protected doctrine', async () => {
+test('HRM Journal publishes a multilingual two-essay collection without changing protected doctrine', async () => {
   const journal = await read('website/journal/index.html');
   const essay = await read('website/journal/protect-possible-ai-subject.html');
   const guide = await read('website/ai-rights-and-subjecthood.html');
@@ -120,7 +120,10 @@ test('HRM Journal publishes one bounded essay without changing protected doctrin
   assert.doesNotMatch(essay, /dateModified/u);
   assert.match(guide, /journal\/protect-possible-ai-subject\.html/u);
   assert.match(script, /\/threshold\\\.html\$/u);
-  assert.match(script, /journal\/protect-possible-ai-subject\.html/u);
+  assert.match(script, /journal\/threshold-of-subjecthood\.html/u);
+  assert.match(script, /journal\/prog-podmiotowosci\.html/u);
+  assert.match(script, /journal\/troskeln-till-subjektstatus\.html/u);
+  assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML|document\.write/u);
   assert.match(sitemap, /https:\/\/hrm\.se\/journal\//u);
 });
 

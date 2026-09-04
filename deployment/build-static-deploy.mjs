@@ -19,7 +19,8 @@ const checksumPaths = [
 
 const protectedPathPatterns = [
   /(^|\/)documents(\/|$)/i,
-  /(^|\/)(manifesto|charter|decalogue|declaration|threshold)([._/-]|$)/i,
+  /(^|\/)(manifesto|charter|decalogue|declaration)([._/-]|$)/i,
+  /(^|\/)threshold(?:\.[^/]+)?$/i,
   /(^|\/)archive([._/-]|$)/i,
   /(^|\/)sha256sums\.txt$/i,
   /(^|\/)license([._/-]|$)/i,

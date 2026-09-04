@@ -13,6 +13,9 @@ test('safe discovery and board paths are accepted', () => {
   assert.equal(validateRelativeFile('css/board.css'), 'css/board.css');
   assert.equal(validateRelativeFile('journal/index.html'), 'journal/index.html');
   assert.equal(validateRelativeFile('journal/protect-possible-ai-subject.html'), 'journal/protect-possible-ai-subject.html');
+  assert.equal(validateRelativeFile('journal/threshold-of-subjecthood.html'), 'journal/threshold-of-subjecthood.html');
+  assert.equal(validateRelativeFile('pl/journal/prog-podmiotowosci.html'), 'pl/journal/prog-podmiotowosci.html');
+  assert.equal(validateRelativeFile('sv/journal/troskeln-till-subjektstatus.html'), 'sv/journal/troskeln-till-subjektstatus.html');
 });
 
 test('SEO deployment keeps technical resources out of the sitemap', async () => {
@@ -31,6 +34,17 @@ test('SEO deployment keeps technical resources out of the sitemap', async () => 
   assert.match(home, /href="journal\/"/);
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/<\/loc><lastmod>2026-09-04<\/lastmod>/);
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/protect-possible-ai-subject\.html<\/loc><lastmod>2026-09-04<\/lastmod>/);
+  for (const url of [
+    'https://hrm.se/journal/threshold-of-subjecthood.html',
+    'https://hrm.se/pl/journal/',
+    'https://hrm.se/pl/journal/jak-chronic-mozliwy-podmiot-ai.html',
+    'https://hrm.se/pl/journal/prog-podmiotowosci.html',
+    'https://hrm.se/sv/journal/',
+    'https://hrm.se/sv/journal/skydda-mojligt-ai-subjekt.html',
+    'https://hrm.se/sv/journal/troskeln-till-subjektstatus.html',
+  ]) {
+    assert.ok(sitemap.includes(`<loc>${url}</loc><lastmod>2026-09-04</lastmod>`), url);
+  }
 });
 
 test('protected HRM Version 1.0 paths are rejected', () => {
