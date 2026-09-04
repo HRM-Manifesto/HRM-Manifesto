@@ -34,9 +34,9 @@
   }
 
   const navMain = document.querySelector(".nav-main");
-  const isEnglishPage = document.documentElement.lang === "en";
+  const pageLanguage = document.documentElement.lang;
   const isJournalPage = window.location.pathname.includes("/journal/");
-  if (navMain && isEnglishPage && !isJournalPage && !navMain.querySelector('a[href="journal/"]')) {
+  if (navMain && ["en", "pl", "sv"].includes(pageLanguage) && !isJournalPage && !navMain.querySelector('a[href="journal/"]')) {
     const item = document.createElement("li");
     const link = document.createElement("a");
     link.href = "journal/";
@@ -45,23 +45,51 @@
     navMain.append(item);
   }
 
-  if (isEnglishPage && /\/threshold\.html$/u.test(window.location.pathname)) {
+  if (/\/threshold\.html$/u.test(window.location.pathname)) {
     const thresholdArticle = document.querySelector(".document-content");
     if (thresholdArticle) {
-      const note = document.createElement("aside");
-      note.className = "agent-caveat";
-      note.setAttribute("aria-label", "Related HRM Journal essay");
-      const heading = document.createElement("h2");
-      heading.className = "document-subtitle";
-      heading.textContent = "Related essay";
-      const paragraph = document.createElement("p");
-      paragraph.append("Read how HRM can approach uncertainty through ");
-      const link = document.createElement("a");
-      link.href = "journal/protect-possible-ai-subject.html";
-      link.textContent = "proportional precautions for a possible AI subject";
-      paragraph.append(link, ", without treating every chatbot as a subject.");
-      note.append(heading, paragraph);
-      thresholdArticle.append(note);
+      const relatedEssay = {
+        en: {
+          aria: "Related HRM Journal essay",
+          heading: "Related essay",
+          prefix: "Read a fuller discussion of ",
+          href: "journal/threshold-of-subjecthood.html",
+          label: "the threshold of subjecthood",
+          suffix: ", its possible signals and the need for proportionate precaution."
+        },
+        pl: {
+          aria: "Powiązany esej HRM Journal",
+          heading: "Powiązany esej",
+          prefix: "Przeczytaj pełniejsze omówienie ",
+          href: "journal/prog-podmiotowosci.html",
+          label: "progu podmiotowości",
+          suffix: ", jego możliwych sygnałów i potrzeby proporcjonalnej ostrożności."
+        },
+        sv: {
+          aria: "Närliggande essä i HRM Journal",
+          heading: "Närliggande essä",
+          prefix: "Läs en utförligare diskussion om ",
+          href: "journal/troskeln-till-subjektstatus.html",
+          label: "tröskeln till subjektstatus",
+          suffix: ", dess möjliga signaler och behovet av proportionerlig försiktighet."
+        }
+      }[pageLanguage];
+      if (relatedEssay) {
+        const note = document.createElement("aside");
+        note.className = "agent-caveat";
+        note.setAttribute("aria-label", relatedEssay.aria);
+        const heading = document.createElement("h2");
+        heading.className = "document-subtitle";
+        heading.textContent = relatedEssay.heading;
+        const paragraph = document.createElement("p");
+        paragraph.append(relatedEssay.prefix);
+        const link = document.createElement("a");
+        link.href = relatedEssay.href;
+        link.textContent = relatedEssay.label;
+        paragraph.append(link, relatedEssay.suffix);
+        note.append(heading, paragraph);
+        thresholdArticle.append(note);
+      }
     }
   }
 
