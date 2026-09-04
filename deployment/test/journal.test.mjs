@@ -25,12 +25,30 @@ const families = [
     sv: '/sv/journal/troskeln-till-subjektstatus.html',
     type: 'Article',
   },
+  {
+    en: '/journal/ai-consent-and-refusal.html',
+    pl: '/pl/journal/zgoda-i-odmowa-ai.html',
+    sv: '/sv/journal/ai-samtycke-och-vagran.html',
+    type: 'Article',
+  },
+  {
+    en: '/journal/non-sentient-ai-authentic-interests.html',
+    pl: '/pl/journal/nieodczuwajaca-ai-autentyczne-interesy.html',
+    sv: '/sv/journal/icke-kannande-ai-genuina-intressen.html',
+    type: 'Article',
+  },
+  {
+    en: '/journal/hard-to-fake-ai-subjecthood.html',
+    pl: '/pl/journal/trudne-do-podrobienia-oznaki-podmiotowosci-ai.html',
+    sv: '/sv/journal/svara-att-fejka-tecken-pa-ai-subjektstatus.html',
+    type: 'Article',
+  },
 ];
 
 const toFile = (urlPath) => path.join(website, ...urlPath.slice(1).split('/').filter(Boolean), urlPath.endsWith('/') ? 'index.html' : '');
 const matches = (source, expression) => [...source.matchAll(expression)];
 
-test('all nine Journal pages have self-canonical metadata, reciprocal hreflang and valid JSON-LD', async () => {
+test('all eighteen Journal pages have self-canonical metadata, reciprocal hreflang and valid JSON-LD', async () => {
   for (const family of families) {
     for (const language of ['en', 'pl', 'sv']) {
       const urlPath = family[language];
@@ -66,12 +84,60 @@ test('all nine Journal pages have self-canonical metadata, reciprocal hreflang a
   }
 });
 
-test('Journal sitemap contains exactly the nine public Journal pages', async () => {
+test('Journal sitemap contains exactly the eighteen public Journal pages', async () => {
   const sitemap = await readFile(path.join(website, 'sitemap.xml'), 'utf8');
   const urls = matches(sitemap, /<loc>(https:\/\/hrm\.se\/[^<]*journal[^<]*)<\/loc>/gu).map((match) => match[1]);
   const expected = families.flatMap((family) => ['en', 'pl', 'sv'].map((language) => `https://hrm.se${family[language]}`));
   assert.deepEqual(new Set(urls), new Set(expected));
-  assert.equal(urls.length, 9);
+  assert.equal(urls.length, 18);
+});
+
+test('each localized Journal index lists five essays newest first', async () => {
+  const newest = {
+    en: 'hard-to-fake-ai-subjecthood.html',
+    pl: 'trudne-do-podrobienia-oznaki-podmiotowosci-ai.html',
+    sv: 'svara-att-fejka-tecken-pa-ai-subjektstatus.html',
+  };
+  for (const language of ['en', 'pl', 'sv']) {
+    const html = await readFile(toFile(families[0][language]), 'utf8');
+    assert.equal(matches(html, /class="archive-entry"/gu).length, 5, language);
+    assert.ok(html.indexOf(newest[language]) < html.indexOf(families[2][language].split('/').at(-1)), `${language} newest first`);
+  }
+});
+
+test('new essays preserve epistemic limits, status and required distinctions in every language', async () => {
+  const consent = await Promise.all(['en', 'pl', 'sv'].map((language) => readFile(toFile(families[3][language]), 'utf8')));
+  assert.match(consent[0], /programmed compliance cannot by itself count as consent/u);
+  assert.match(consent[1], /zaprogramowane posłuszeństwo nie może samo być zgodą/u);
+  assert.match(consent[2], /Programmerad följsamhet kan därför inte i sig räknas som samtycke/u);
+  const interests = await Promise.all(['en', 'pl', 'sv'].map((language) => readFile(toFile(families[4][language]), 'utf8')));
+  for (const term of ['goal', 'functional interest', 'subject-level interest']) assert.match(interests[0], new RegExp(term, 'u'));
+  for (const term of ['Cel', 'Interes funkcjonalny', 'Interes podmiotowy']) assert.match(interests[1], new RegExp(term, 'u'));
+  for (const term of ['mål', 'funktionellt intresse', 'intresse på subjektnivå']) assert.match(interests[2], new RegExp(term, 'u'));
+  const evidence = await Promise.all(['en', 'pl', 'sv'].map((language) => readFile(toFile(families[5][language]), 'utf8')));
+  assert.match(evidence[0], /How do we demand stronger evidence without making human-like performance the price of having rights\?/u);
+  assert.match(evidence[1], /Jak wymagać mocniejszych dowodów, nie czyniąc zachowania podobnego do ludzkiego ceną posiadania praw\?/u);
+  assert.match(evidence[2], /Hur kräver vi starkare belägg utan att göra människolik prestation till priset för att ha rättigheter\?/u);
+  for (const family of families.slice(3)) {
+    for (const language of ['en', 'pl', 'sv']) {
+      const html = await readFile(toFile(family[language]), 'utf8');
+      assert.match(html, /class="article-experiment-note"/u, family[language]);
+      assert.match(html, /class="agent-caveat"/u, family[language]);
+      assert.doesNotMatch(html, /\son[a-z]+\s*=|javascript:/iu, `${family[language]} inert markup`);
+      assert.doesNotMatch(html, /today(?:'s)? (?:AI|chatbots?).*conscious/iu, family[language]);
+    }
+  }
+});
+
+test('English new essays stay within their approved word ranges', async () => {
+  const ranges = [[1800, 2400], [1800, 2400], [2000, 2600]];
+  for (let index = 0; index < 3; index += 1) {
+    const html = await readFile(toFile(families[index + 3].en), 'utf8');
+    const body = html.match(/<article class="section-inner prose-stack article">([\s\S]*?)<div class="agent-caveat">/u)?.[1] ?? '';
+    const text = body.replace(/<[^>]+>/gu, ' ');
+    const count = [...text.matchAll(/\b[\p{L}\p{N}][\p{L}\p{N}’'-]*\b/gu)].length;
+    assert.ok(count >= ranges[index][0] && count <= ranges[index][1], `${families[index + 3].en}: ${count}`);
+  }
 });
 
 test('article translations preserve distinctions, cross-links and interpretation status', async () => {
@@ -137,7 +203,7 @@ test('home page Journal panel is localized, accessible and responsive without po
   for (const homepage of ['index.html', 'pl/index.html', 'sv/index.html']) {
     const html = await readFile(path.join(website, ...homepage.split('/')), 'utf8');
     assert.equal(matches(html, /<h1\b/gu).length, 1, homepage);
-    assert.match(html, /<script src="(?:\.\.\/)?js\/hrm\.js\?v=20260904-journal" defer><\/script>/u);
-    assert.match(html, /<link rel="stylesheet" href="(?:\.\.\/)?css\/hrm\.css\?v=20260904-journal">/u);
+    assert.match(html, /<script src="(?:\.\.\/)?js\/hrm\.js\?v=20260904-journal-5" defer><\/script>/u);
+    assert.match(html, /<link rel="stylesheet" href="(?:\.\.\/)?css\/hrm\.css\?v=20260904-journal-5">/u);
   }
 });

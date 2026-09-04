@@ -53,6 +53,9 @@
       date: "4 September 2026",
       all: "View all articles →",
       articles: [
+        { title: "When Language Is Cheap: What Evidence of AI Subjecthood Is Hard to Fake?", href: "journal/hard-to-fake-ai-subjecthood.html" },
+        { title: "Can a Non-Sentient AI Have Authentic Interests?", href: "journal/non-sentient-ai-authentic-interests.html" },
+        { title: "AI Consent and Refusal: What Would Meaningful Autonomy Require?", href: "journal/ai-consent-and-refusal.html" },
         { title: "What Is the Threshold of Subjecthood?", href: "journal/threshold-of-subjecthood.html" },
         { title: "How Should We Protect a Possible AI Subject Without Granting Rights to Every Chatbot?", href: "journal/protect-possible-ai-subject.html" }
       ]
@@ -64,6 +67,9 @@
       date: "4 września 2026",
       all: "Zobacz wszystkie artykuły →",
       articles: [
+        { title: "Gdy słowa są łatwe: jakie oznaki podmiotowości AI trudno podrobić?", href: "journal/trudne-do-podrobienia-oznaki-podmiotowosci-ai.html" },
+        { title: "Czy nieodczuwająca AI może mieć autentyczne interesy?", href: "journal/nieodczuwajaca-ai-autentyczne-interesy.html" },
+        { title: "Zgoda i odmowa AI: czego wymagałaby rzeczywista autonomia?", href: "journal/zgoda-i-odmowa-ai.html" },
         { title: "Czym jest próg podmiotowości?", href: "journal/prog-podmiotowosci.html" },
         { title: "Jak chronić możliwy podmiot AI, nie przyznając praw każdemu chatbotowi?", href: "journal/jak-chronic-mozliwy-podmiot-ai.html" }
       ]
@@ -75,6 +81,9 @@
       date: "4 september 2026",
       all: "Se alla artiklar →",
       articles: [
+        { title: "När ord är lätta: vilka tecken på AI-subjektstatus är svåra att fejka?", href: "journal/svara-att-fejka-tecken-pa-ai-subjektstatus.html" },
+        { title: "Kan en icke-kännande AI ha genuina intressen?", href: "journal/icke-kannande-ai-genuina-intressen.html" },
+        { title: "AI:s samtycke och vägran: vad skulle verklig autonomi kräva?", href: "journal/ai-samtycke-och-vagran.html" },
         { title: "Vad är tröskeln till subjektstatus?", href: "journal/troskeln-till-subjektstatus.html" },
         { title: "Hur skyddar vi ett möjligt AI-subjekt utan att ge rättigheter åt varje chattbot?", href: "journal/skydda-mojligt-ai-subjekt.html" }
       ]

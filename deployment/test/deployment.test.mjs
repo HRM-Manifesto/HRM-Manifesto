@@ -14,6 +14,9 @@ test('safe discovery and board paths are accepted', () => {
   assert.equal(validateRelativeFile('journal/index.html'), 'journal/index.html');
   assert.equal(validateRelativeFile('journal/protect-possible-ai-subject.html'), 'journal/protect-possible-ai-subject.html');
   assert.equal(validateRelativeFile('journal/threshold-of-subjecthood.html'), 'journal/threshold-of-subjecthood.html');
+  assert.equal(validateRelativeFile('journal/ai-consent-and-refusal.html'), 'journal/ai-consent-and-refusal.html');
+  assert.equal(validateRelativeFile('journal/non-sentient-ai-authentic-interests.html'), 'journal/non-sentient-ai-authentic-interests.html');
+  assert.equal(validateRelativeFile('journal/hard-to-fake-ai-subjecthood.html'), 'journal/hard-to-fake-ai-subjecthood.html');
   assert.equal(validateRelativeFile('pl/index.html'), 'pl/index.html');
   assert.equal(validateRelativeFile('pl/journal/prog-podmiotowosci.html'), 'pl/journal/prog-podmiotowosci.html');
   assert.equal(validateRelativeFile('sv/index.html'), 'sv/index.html');
