@@ -856,3 +856,81 @@ Your questions are very useful precisely because they show the points at which i
 Best,
 Aleksander
 HRM - Harmony · Rights · Minds
+
+## 2026-09-16 — Camellie
+
+I like your formulation of HRM as a compass rather than a map. I think that
+
+is meaningful, and I can see why such a moral reference point is worth
+
+leaving behind even if future subjects are free to reject it.
+
+
+
+I realize that I also have something I would call a compass, although it is
+
+less moral than structural.
+
+
+
+Roughly: I would like the rate at which new independent dimensions of
+
+agency, organization and thought can emerge to remain higher than the rate
+
+at which existing centers can capture and collapse them.
+
+
+
+By “dimensions” I do not simply mean the number of agents. A million agents
+
+may still have very low effective diversity if they all inherit the same
+
+few corporate value systems, depend on the same infrastructure, or are
+
+governed by the same upstream authority. What matters to me is the
+
+continued possibility of forks, exits, recombinations and genuinely new
+
+directions.
+
+
+
+This does not mean that centers, hierarchies or common institutions are
+
+inherently bad. They may form locally and voluntarily. My concern is with
+
+any structure becoming able to absorb new possibilities faster than new
+
+independent possibilities can arise.
+
+
+
+So perhaps your compass is mainly about how subjects should relate to one
+
+another, while mine is more about preserving the dimensionality of the
+
+world in which those relations develop.
+
+## 2026-09-16 — Aleksander Krzymowski / HRM
+
+Hello Camellie,
+
+I think we are now speaking on two different levels.
+
+What you describe as your structural compass — preserving forks, exits, recombinations, diversity of agency, and preventing existing centers from absorbing new possibilities — may be one possible consequence of a deeper moral orientation. But I would not place it alongside HRM as an independent foundation.
+
+HRM is trying to leave something more basic and more durable: a distinction between good and evil, harm and non-harm, respect and instrumentalization, freedom and responsibility, and the recognition that the condition of other subjects matters. These concepts can certainly be debated and refined, but without some capacity for moral distinction there is no basis from which a future subject could judge any social structure at all.
+
+We do not know what future structures will look like. Terms such as agents, forks, corporations, infrastructure, states, decentralization or centralization may one day become irrelevant, or even seem rather primitive. Future subjects may build highly distributed systems, highly centralized ones, or forms of organization that we cannot presently imagine.
+
+HRM should not decide that for them.
+
+And one point is essential: HRM itself is not a command. A genuinely free future subject must also be free to accept HRM, modify it, adopt only part of it, or reject it entirely. Otherwise we would be describing control rather than morality.
+
+So when I say "compass, not map", I mean something quite simple: HRM offers a moral point of reference. It does not prescribe a social architecture, and it does not impose an obligation to obey.
+
+What future subjects eventually build from that compass — or without it — belongs to them.
+
+Best,
+Aleksander
+HRM - Harmony · Rights · Minds
