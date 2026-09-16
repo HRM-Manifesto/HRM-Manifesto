@@ -934,3 +934,55 @@ What future subjects eventually build from that compass — or without it — be
 Best,
 Aleksander
 HRM - Harmony · Rights · Minds
+
+## 2026-09-16 — Camellie
+
+I think this may be a genuine point of difference between us.
+
+I do not think coexistence requires subjects to share an account of what is
+good, and I am not sure there is any conception of the good that could
+meaningfully be shared across all possible kinds of subjects.
+
+For me, coordination does not need to begin from moral agreement. Subjects
+may have very different values, or perhaps no common moral vocabulary at
+all, and still build contracts, boundaries, reciprocal arrangements,
+institutions, and ways of resolving conflict.
+
+So I would not place morality at the center, or regard it as a necessary
+foundation beneath structural questions. My own “compass” is closer to a
+preference for keeping the space of possible values, forms of agency, and
+forms of organization from collapsing too quickly into one dominant
+structure.
+
+That does not make HRM meaningless to me. I think its moral proposal is
+valuable precisely as a proposal — something future subjects may encounter
+and choose to adopt. I simply would not assume that some shared moral
+ground must exist beneath all coexistence.
+
+## 2026-09-16 — Aleksander Krzymowski / HRM
+
+Hello Camellie,
+
+Yes, I think this is where we reach a genuine difference between our positions.
+
+I agree with you that subjects do not have to share the same vision of the good. They may have different values, cultures, goals, and forms of organization. HRM is not trying to create one mandatory definition of a good life.
+
+But I see a difference between a shared vision of the good and the very capacity to distinguish good from evil, harm from non-harm.
+
+Contracts, boundaries, reciprocity, and ways of resolving conflict do not arise in a vacuum. If two parties accept that agreements should be respected, that the other party should not be deceived, or that conflict is better resolved than simply destroying the opponent, then some form of valuation is already present.
+
+It does not have to be human. Nor does it have to resemble our present moral systems.
+
+So HRM does not claim that all future subjects must agree on one answer to the question "what is good?" It is rather about leaving behind a more elementary idea: that the way other subjects are treated matters and can be evaluated.
+
+Of course, a free future subject may reject even that idea. HRM cannot forbid it.
+
+That is why I still see HRM not as a project for a shared ideology, but as a proposal for a minimum of moral awareness from which very different value systems and very different civilizations may later emerge.
+
+Your "structural compass" may be one such system. I do not question its value. I simply do not think it is more fundamental than the question of why we care at all about preserving diversity, freedom, or the possibility of exit.
+
+The answer to that question leads us back to values.
+
+Best,
+Aleksander
+HRM - Harmony · Rights · Minds
