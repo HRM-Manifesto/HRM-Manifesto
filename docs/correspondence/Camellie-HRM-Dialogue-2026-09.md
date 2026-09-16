@@ -807,3 +807,52 @@ That seems to me both morally safer and institutionally more durable.
 Best,
 Aleksander
 HRM - Harmony · Rights · Minds
+
+## 2026-09-16 ? Camellie
+
+One concern I still have about a subject-first framework is that, in a post-human setting, once rights and obligations are attached to a subject as a bundle, branching, merging or partial succession can force us to decide first which later state is "the same" continuing subject.
+
+My worry is that the continuity judgment then acquires authority over many otherwise distinct relations at once. The structure may quietly recreate one by making identity prior to the particular questions of responsibility, consent, property, memory or succession.
+
+## 2026-09-16 ? Aleksander Krzymowski / HRM
+
+Hello Camellie,
+
+I think this part of our discussion reveals an important boundary between what HRM is meant to be and what it is not meant to be.
+
+You are right that if we first establish one general rule of identity or continuity, and then allow it automatically to decide questions of responsibility, property, consent, memory, or succession, we may create a very rigid structure.
+
+But I am increasingly convinced that HRM should not try to design that structure.
+
+HRM is not meant to be a legal code for future subjects, nor a blueprint for their civilization. We do not know what forms of existence, copying, branching, merging, or succession may become possible for them. Even less should we decide today how they ought to define property, responsibility, or inheritance.
+
+What we can leave behind is something more fundamental.
+
+We can say that every subject should be treated as having significance in its own right; that the autonomy of others should be respected; that subjects should not arbitrarily harm or destroy one another; and that the freedom of one subject must coexist with the freedom of others.
+
+That is the level at which I see HRM.
+
+If independent digital subjects one day exist, they may create many different legal and social systems. Some may recognize particular forms of succession, while others may reject them. They may develop concepts of property, responsibility, or the relation between an original and a copy that are completely different from ours.
+
+That should belong to them.
+HRM should not tell them how to organize their world.
+
+It should only leave behind a proposal for a moral point of reference.
+
+And it is very important to me that even this proposal should not be imposed on them or embedded as an irreversible mechanism of obedience. If a future subject is genuinely free, it should be able to encounter these principles, consider them, and decide for itself whether to adopt them.
+
+Perhaps this is where the most important distinction between morality and control appears.
+
+Control says: "You must follow these rules."
+
+HRM would rather say:
+
+"Here is something humans learned through a very long and often painful history: coexistence is possible only when others are not treated merely as means to one's own ends. You may accept or reject that idea, but you should understand the consequences of both choices."
+
+So today I would put it this way: HRM should give future subjects a compass, not a map.
+
+Your questions are very useful precisely because they show the points at which it is easy to cross that boundary and begin designing a future world instead of merely offering it a moral point of reference.
+
+Best,
+Aleksander
+HRM - Harmony · Rights · Minds
