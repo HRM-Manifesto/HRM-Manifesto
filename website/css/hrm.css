@@ -1176,3 +1176,87 @@ p {
     transform: none !important;
   }
 }
+
+/* 2026-09-18 credibility reframe */
+.home-v2 .site-header,
+body:not(.home-v2) .site-header { box-shadow: 0 1px 0 var(--line); }
+.reframe-hero { padding: clamp(5rem, 9vw, 8rem) 1.25rem clamp(4rem, 7vw, 6rem); }
+.reframe-hero .section-wide { max-width: 72rem; }
+.reframe-hero h1 { max-width: 15ch; margin: 0; font-size: clamp(3.2rem, 7.5vw, 7rem); }
+.reframe-lead { max-width: 62ch; margin: 2rem 0 0; font-size: clamp(1.15rem, 1rem + .55vw, 1.55rem); line-height: 1.55; }
+.status-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; margin-top: 3.5rem; border: 1px solid var(--line); background: var(--line); }
+.status-strip span { padding: 1rem 1.1rem; background: var(--paper); font-size: .78rem; font-weight: 700; line-height: 1.4; }
+.reframe-section { padding-block: clamp(4.5rem,8vw,7.5rem); }
+.reframe-section h2 { max-width: 18ch; font-size: clamp(2.3rem,4.6vw,4.2rem); }
+.claim-grid, .layer-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 2.5rem; border: 1px solid var(--line); background: var(--line); }
+.claim-grid article, .layer-grid article { min-height: 16rem; padding: clamp(1.6rem,3vw,2.6rem); background: var(--paper); }
+.claim-grid h3, .layer-grid h3 { margin-top: 0; font-size: clamp(1.4rem,2.2vw,2rem); }
+.claim-grid p, .layer-grid p { color: var(--muted); }
+
+.reframe-dark { background: var(--charcoal); color: var(--paper); }
+.reframe-dark .eyebrow { color: #c8b28f; }
+.reframe-dark h2 { max-width: 22ch; }
+.reframe-dark .reframe-lead { color: rgba(244,241,233,.78); }
+.layer-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.layer-tag { display: inline-block; margin-bottom: 2rem; color: var(--metal); font-size: .74rem; font-weight: 800; letter-spacing: .14em; }
+.layer-grid a { display: inline-block; margin-top: 1.2rem; font-weight: 700; text-decoration: none; }
+.question-list { max-width: 58rem; border-top: 1px solid var(--line); }
+.question-list p { margin: 0; padding: 1.3rem 0; border-bottom: 1px solid var(--line); }
+.question-list strong { display: inline-block; min-width: 9rem; }
+.reading-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 2.5rem; border: 1px solid var(--line); background: var(--line); }
+.reading-grid a { display: grid; grid-template-columns: 2.5rem 1fr; gap: .3rem 1rem; padding: 1.5rem; background: var(--paper); text-decoration: none; }
+.reading-grid a span { grid-row: 1 / 3; font-family: var(--serif); font-size: 2rem; color: var(--metal); }
+.reading-grid strong { font-size: 1rem; }
+.reading-grid small { color: var(--muted); font-size: .82rem; }
+.reframe-about { border-top: 1px solid var(--line); }
+.reframe-about h2 { max-width: 14ch; }
+
+.reframe-hero { padding: clamp(5rem, 9vw, 8rem) 1.25rem clamp(4rem, 7vw, 6rem); }
+.reframe-hero .section-wide { max-width: 72rem; }
+.reframe-hero h1 { max-width: 15ch; margin: 0; font-size: clamp(3.2rem, 7.5vw, 7rem); }
+.reframe-lead { max-width: 62ch; margin: 2rem 0 0; font-size: clamp(1.15rem, 1rem + .55vw, 1.55rem); line-height: 1.55; }
+.status-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; margin-top: 3.5rem; border: 1px solid var(--line); background: var(--line); }
+.status-strip span { padding: 1rem 1.1rem; background: var(--paper); font-size: .78rem; font-weight: 700; line-height: 1.4; }
+.reframe-section { padding-block: clamp(4.5rem,8vw,7.5rem); }
+.reframe-section h2 { max-width: 18ch; font-size: clamp(2.3rem,4.6vw,4.2rem); }
+.claim-grid, .layer-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 2.5rem; border: 1px solid var(--line); background: var(--line); }
+.claim-grid article, .layer-grid article { min-height: 16rem; padding: clamp(1.6rem,3vw,2.6rem); background: var(--paper); }
+.claim-grid h3, .layer-grid h3 { margin-top: 0; font-size: clamp(1.4rem,2.2vw,2rem); }
+.claim-grid p, .layer-grid p { color: var(--muted); }
+
+.reframe-dark { background: var(--charcoal); color: var(--paper); }
+.reframe-dark .eyebrow { color: var(--metal); }
+.reframe-dark h2 { max-width: 22ch; }
+.reframe-dark .reframe-lead { opacity: .82; }
+.layer-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.layer-tag { display: inline-block; margin-bottom: 2rem; color: var(--metal); font-size: .74rem; font-weight: 800; letter-spacing: .14em; }
+.layer-grid a { display: inline-block; margin-top: 1.2rem; font-weight: 700; text-decoration: none; }
+.question-list { max-width: 58rem; border-top: 1px solid var(--line); }
+.question-list p { margin: 0; padding: 1.3rem 0; border-bottom: 1px solid var(--line); }
+.question-list strong { display: inline-block; min-width: 9rem; }
+.reading-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; margin-top: 2.5rem; border: 1px solid var(--line); background: var(--line); }
+.reading-grid a { display: grid; grid-template-columns: 2.5rem 1fr; gap: .3rem 1rem; padding: 1.5rem; background: var(--paper); text-decoration: none; }
+.reading-grid a span { grid-row: 1 / 3; font-family: var(--serif); font-size: 2rem; color: var(--metal); }
+.reading-grid strong { font-size: 1rem; }
+.reading-grid small { color: var(--muted); font-size: .82rem; }
+.reframe-about { border-top: 1px solid var(--line); }
+.reframe-about h2 { max-width: 14ch; }
+
+.document-hero .document-intro { max-width: 58ch; }
+.prose-stack h2 { margin-top: 4rem; }
+.prose-stack h2:first-child { margin-top: 0; }
+.home-v2 .button { border-radius: 0; }
+.home-v2 .actions { margin-top: 2rem; }
+.site-footer { font-size: .82rem; }
+.contact-note { margin-top: 3rem; }
+@media (max-width: 900px) {
+  .status-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .layer-grid, .claim-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .reframe-hero { padding-top: 3.5rem; }
+  .reframe-hero h1 { font-size: clamp(2.8rem,14vw,4.4rem); }
+  .status-strip, .reading-grid { grid-template-columns: 1fr; }
+  .question-list strong { display: block; min-width: 0; margin-bottom: .25rem; }
+  .claim-grid article, .layer-grid article { min-height: 0; }
+}
