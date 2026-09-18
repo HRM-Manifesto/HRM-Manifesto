@@ -37,3 +37,7 @@ js/board.js
 llms.txt
 manifest.json
 sitemap.xml
+
+about.html
+pl/about.html
+sv/about.html
