@@ -27,6 +27,7 @@ sv/journal/svara-att-fejka-tecken-pa-ai-subjektstatus.html
 hrm-knowledge-capsule.schema.json
 hrm-knowledge-capsule-1.0.schema.json
 hrm-knowledge-capsule-1.1.schema.json
+images/threshold-duality.svg
 css/board.css
 css/hrm.css
 css/hrm-visual3d.css

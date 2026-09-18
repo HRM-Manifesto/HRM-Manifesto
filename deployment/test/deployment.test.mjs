@@ -105,8 +105,8 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
 
   for (const page of ['index.html', 'pl/index.html', 'sv/index.html']) {
     const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
-    assert.match(html, /hrm-visual3d\.css\?v=20260918-v1/);
-    assert.match(html, /hrm-visual3d\.js\?v=20260918-v1/);
+    assert.match(html, /hrm-visual3d\.css\?v=20260918-v2/);
+    assert.match(html, /hrm-visual3d\.js\?v=20260918-v2/);
   }
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(js, /prefers-reduced-motion: reduce/);
@@ -114,4 +114,5 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
   assert.match(js, /IntersectionObserver/);
   assert.match(allowlist, /css\/hrm-visual3d\.css/);
   assert.match(allowlist, /js\/hrm-visual3d\.js/);
+  assert.match(allowlist, /images\/threshold-duality\.svg/);
 });

@@ -20,6 +20,13 @@
   canvas.setAttribute("aria-hidden", "true");
   hero.prepend(canvas);
 
+  const scene = document.createElement("img");
+  scene.className = "hrm-duality-scene";
+  scene.src = "/images/threshold-duality.svg?v=20260918-v2";
+  scene.alt = "";
+  scene.setAttribute("aria-hidden", "true");
+  hero.append(scene);
+
   const field = document.createElement("div");
   field.className = "hrm-spatial-field";
   field.setAttribute("aria-hidden", "true");
@@ -49,6 +56,8 @@
     pointer.y = (event.clientY / window.innerHeight - 0.5) * 2;
     body.style.setProperty("--v3-mx", pointer.x.toFixed(3));
     body.style.setProperty("--v3-my", pointer.y.toFixed(3));
+    body.style.setProperty("--v3-x", (pointer.x * 10).toFixed(2) + "px");
+    body.style.setProperty("--v3-y", (pointer.y * 7).toFixed(2) + "px");
   };
   window.addEventListener("pointermove", updatePointer, { passive: true });
 

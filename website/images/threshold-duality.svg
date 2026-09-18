@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="t d">
+<title id="t">HRM threshold duality</title><desc id="d">Abstract human and artificial forms facing a luminous threshold.</desc>
+<defs>
+<radialGradient id="bg" cx="50%" cy="48%" r="64%"><stop offset="0" stop-color="#342d23" stop-opacity=".92"/><stop offset=".34" stop-color="#18191b" stop-opacity=".8"/><stop offset="1" stop-color="#0b0d0f" stop-opacity="0"/></radialGradient>
+<radialGradient id="human" cx="68%" cy="35%" r="70%"><stop offset="0" stop-color="#f7e7c8"/><stop offset=".18" stop-color="#caa76f"/><stop offset=".55" stop-color="#4e4336"/><stop offset="1" stop-color="#111214"/></radialGradient>
+<linearGradient id="ai" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4eee0"/><stop offset=".32" stop-color="#92784f"/><stop offset=".62" stop-color="#2d3135"/><stop offset="1" stop-color="#0f1113"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#84663a" stop-opacity="0"/><stop offset=".5" stop-color="#e5c181"/><stop offset="1" stop-color="#84663a" stop-opacity="0"/></linearGradient>
+<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="34"/></filter>
+</defs>
+<ellipse cx="800" cy="445" rx="690" ry="410" fill="url(#bg)"/>
+<g opacity=".32" fill="none" stroke="#c19b60" stroke-width="1"><ellipse cx="800" cy="450" rx="390" ry="118" transform="rotate(-11 800 450)"/><ellipse cx="800" cy="450" rx="330" ry="78" transform="rotate(28 800 450)"/><ellipse cx="800" cy="450" rx="245" ry="56" transform="rotate(72 800 450)"/></g>
+<circle cx="800" cy="450" r="96" fill="#b28b52" opacity=".18" filter="url(#soft)"/><circle cx="800" cy="450" r="82" fill="none" stroke="#d7b273" stroke-width="1.6" opacity=".88" filter="url(#glow)"/><circle cx="800" cy="450" r="54" fill="none" stroke="#d7b273" stroke-width=".9" opacity=".5"/><circle cx="800" cy="450" r="9" fill="#f4d9a5" filter="url(#glow)"/>
+<path d="M240 720 C225 590 260 455 337 351 C382 290 430 255 477 245 C511 238 537 251 552 279 C567 306 558 336 533 365 C514 386 504 407 507 429 C509 452 524 470 543 488 C560 503 565 521 555 538 C543 558 519 565 497 572 C470 580 455 598 452 625 C449 653 455 689 466 720 Z" fill="url(#human)" opacity=".97"/>
+<path d="M466 720 C455 689 449 653 452 625 C455 598 470 580 497 572 C519 565 543 558 555 538 C565 521 560 503 543 488 C524 470 509 452 507 429 C504 407 514 386 533 365 C558 336 567 306 552 279" fill="none" stroke="#dfbd83" stroke-width="2.2" opacity=".62"/>
+<g opacity=".32" stroke="#d7b273" fill="none"><path d="M285 612 C356 564 422 548 493 552"/><path d="M272 650 C346 604 402 590 456 588"/><path d="M306 555 C362 516 417 493 509 485"/></g>
+<path d="M1360 720 C1375 590 1340 455 1263 351 C1218 290 1170 255 1123 245 C1089 238 1063 251 1048 279 L1018 338 L1038 365 L1015 414 L1040 443 L1018 486 L1048 520 L1033 560 L1070 582 L1079 625 C1082 653 1075 689 1064 720 Z" fill="url(#ai)" opacity=".98"/>
+<path d="M1064 720 C1075 689 1082 653 1079 625 L1070 582 L1033 560 L1048 520 L1018 486 L1040 443 L1015 414 L1038 365 L1018 338 L1048 279 C1063 251 1089 238 1123 245" fill="none" stroke="#e0bd80" stroke-width="2.1" opacity=".7"/>
+<g fill="none" stroke="#d7b273" opacity=".46"><path d="M1326 612 L1184 568 L1070 582"/><path d="M1338 651 L1212 604 L1079 625"/><path d="M1294 555 L1177 506 L1048 520"/></g>
+<g fill="#d7b273" opacity=".7"><circle cx="1120" cy="446" r="3"/><circle cx="1162" cy="510" r="2.5"/><circle cx="1218" cy="590" r="2"/><circle cx="480" cy="452" r="2.5"/><circle cx="410" cy="530" r="2"/><circle cx="350" cy="604" r="2.5"/></g>
+<path d="M575 450 H713 M887 450 H1025" stroke="url(#gold)" stroke-width="2" filter="url(#glow)"/>
+</svg>
