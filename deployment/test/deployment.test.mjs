@@ -105,7 +105,7 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
 
   for (const page of ['index.html', 'pl/index.html', 'sv/index.html']) {
     const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
-    assert.match(html, /hrm-visual3d\.css\?v=20260918-v2/);
+    assert.match(html, /hrm-visual3d\.css\?v=20260918-v3/);
     assert.match(html, /hrm-visual3d\.js\?v=20260918-v2/);
   }
   assert.match(css, /prefers-reduced-motion: reduce/);
@@ -125,9 +125,9 @@ test('marketing question is simplified and inner pages share restrained depth ef
   const pl = await readFile(path.join(root, 'website', 'pl', 'index.html'), 'utf8');
   const en = await readFile(path.join(root, 'website', 'index.html'), 'utf8');
   const sv = await readFile(path.join(root, 'website', 'sv', 'index.html'), 'utf8');
-  assert.match(pl, /Co, jeśli AI kiedyś zacznie mieć własne interesy\?/);
-  assert.match(en, /What if AI one day has interests of its own\?/);
-  assert.match(sv, /Tänk om AI en dag får egna intressen\?/);
+  assert.match(pl, /Człowiek i AI\. Co, jeśli AI przestanie być tylko narzędziem\?/);
+  assert.match(en, /Humans and AI\. What if AI stops being just a tool\?/);
+  assert.match(sv, /Människan och AI\. Tänk om AI inte längre bara är ett verktyg\?/);
 
   for (const page of [
     'about.html',

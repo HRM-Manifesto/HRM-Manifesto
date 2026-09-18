@@ -283,7 +283,7 @@
 }
 .reframe-hero h1 {
   max-width: 11ch;
-  font-size: clamp(3.6rem, 7vw, 7.2rem);
+  font-size: clamp(2.5rem, 4.9vw, 5.05rem);
   line-height: .97;
   color: #f8f4eb;
   text-shadow: 0 8px 40px rgba(0,0,0,.34);
