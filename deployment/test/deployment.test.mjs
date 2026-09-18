@@ -94,3 +94,24 @@ test('service deployment saves an exact rollback artifact before code deployment
   assert.match(workflow, /cmp payload\/gateway\/src\/BoardAdmin\.php remote-verify\/BoardAdmin\.php/);
   assert.ok(workflow.indexOf('Save code rollback artifact before deployment') < workflow.indexOf('Deploy tested code and create missing configuration'));
 });
+
+test('home pages ship the restrained Visual 3D layer with motion fallback', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const css = await readFile(path.join(root, 'website', 'css', 'hrm-visual3d.css'), 'utf8');
+  const js = await readFile(path.join(root, 'website', 'js', 'hrm-visual3d.js'), 'utf8');
+  const allowlist = await readFile(path.join(root, 'deployment', 'hrm-static-files.txt'), 'utf8');
+
+  for (const page of ['index.html', 'pl/index.html', 'sv/index.html']) {
+    const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
+    assert.match(html, /hrm-visual3d\.css\?v=20260918-v1/);
+    assert.match(html, /hrm-visual3d\.js\?v=20260918-v1/);
+  }
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(js, /prefers-reduced-motion: reduce/);
+  assert.match(js, /hrm-spatial-field/);
+  assert.match(js, /IntersectionObserver/);
+  assert.match(allowlist, /css\/hrm-visual3d\.css/);
+  assert.match(allowlist, /js\/hrm-visual3d\.js/);
+});

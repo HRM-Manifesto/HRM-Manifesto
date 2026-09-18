@@ -29,10 +29,12 @@ hrm-knowledge-capsule-1.0.schema.json
 hrm-knowledge-capsule-1.1.schema.json
 css/board.css
 css/hrm.css
+css/hrm-visual3d.css
 index.html
 pl/index.html
 sv/index.html
 js/hrm.js
+js/hrm-visual3d.js
 js/board.js
 llms.txt
 manifest.json
