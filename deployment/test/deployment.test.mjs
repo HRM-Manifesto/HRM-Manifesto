@@ -105,7 +105,7 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
 
   for (const page of ['index.html', 'pl/index.html', 'sv/index.html']) {
     const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
-    assert.match(html, /hrm-visual3d\.css\?v=20260918-v3/);
+    assert.match(html, /hrm-visual3d\.css\?v=20260918-v4/);
     assert.match(html, /hrm-visual3d\.js\?v=20260918-v2/);
   }
   assert.match(css, /prefers-reduced-motion: reduce/);
@@ -125,9 +125,11 @@ test('marketing question is simplified and inner pages share restrained depth ef
   const pl = await readFile(path.join(root, 'website', 'pl', 'index.html'), 'utf8');
   const en = await readFile(path.join(root, 'website', 'index.html'), 'utf8');
   const sv = await readFile(path.join(root, 'website', 'sv', 'index.html'), 'utf8');
-  assert.match(pl, /Człowiek i AI\. Co, jeśli AI przestanie być tylko narzędziem\?/);
-  assert.match(en, /Humans and AI\. What if AI stops being just a tool\?/);
-  assert.match(sv, /Människan och AI\. Tänk om AI inte längre bara är ett verktyg\?/);
+  assert.match(pl, /hero-title-prefix">Człowiek i AI\.<\/span><span class="hero-title-question">Co, jeśli AI przestanie być tylko narzędziem\?/);
+  assert.match(en, /hero-title-prefix">Humans and AI\.<\/span><span class="hero-title-question">What if AI stops being just a tool\?/);
+  assert.match(sv, /hero-title-prefix">Människan och AI\.<\/span><span class="hero-title-question">Tänk om AI inte längre bara är ett verktyg\?/);
+  assert.match(pl, /class="menu-label"[^>]*>Menu<\/span>/);
+  assert.match(sv, /class="menu-label"[^>]*>Meny<\/span>/);
 
   for (const page of [
     'about.html',
