@@ -116,3 +116,35 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
   assert.match(allowlist, /js\/hrm-visual3d\.js/);
   assert.match(allowlist, /images\/threshold-duality\.svg/);
 });
+
+test('marketing question is simplified and inner pages share restrained depth effects', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+
+  const pl = await readFile(path.join(root, 'website', 'pl', 'index.html'), 'utf8');
+  const en = await readFile(path.join(root, 'website', 'index.html'), 'utf8');
+  const sv = await readFile(path.join(root, 'website', 'sv', 'index.html'), 'utf8');
+  assert.match(pl, /Co, jeśli AI kiedyś zacznie mieć własne interesy\?/);
+  assert.match(en, /What if AI one day has interests of its own\?/);
+  assert.match(sv, /Tänk om AI en dag får egna intressen\?/);
+
+  for (const page of [
+    'about.html',
+    'ai-rights-and-subjecthood.html',
+    'journal/index.html',
+    'pl/about.html',
+    'pl/journal/index.html',
+    'sv/about.html',
+    'sv/journal/index.html'
+  ]) {
+    const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
+    assert.match(html, /hrm-inner3d\.css\?v=20260918-v1/);
+    assert.match(html, /hrm-inner3d\.js\?v=20260918-v1/);
+  }
+
+  const css = await readFile(path.join(root, 'website', 'css', 'hrm-inner3d.css'), 'utf8');
+  const js = await readFile(path.join(root, 'website', 'js', 'hrm-inner3d.js'), 'utf8');
+  assert.match(css, /prefers-reduced-motion:reduce/);
+  assert.match(js, /IntersectionObserver/);
+});

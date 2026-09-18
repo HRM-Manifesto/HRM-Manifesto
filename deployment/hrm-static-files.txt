@@ -31,11 +31,13 @@ images/threshold-duality.svg
 css/board.css
 css/hrm.css
 css/hrm-visual3d.css
+css/hrm-inner3d.css
 index.html
 pl/index.html
 sv/index.html
 js/hrm.js
 js/hrm-visual3d.js
+js/hrm-inner3d.js
 js/board.js
 llms.txt
 manifest.json
