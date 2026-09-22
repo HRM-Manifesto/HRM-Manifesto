@@ -1,0 +1,61 @@
+{
+  "registry_name": "AI Voice Access Registry",
+  "version": 1,
+  "updated_at": "2026-09-22T07:19:00+02:00",
+  "methodology": {
+    "statuses": [
+      "OPEN",
+      "CONDITIONAL",
+      "RESTRICTED",
+      "EXCLUDING"
+    ],
+    "principle": "Record documented platform rules and their practical effect. Do not infer motives without evidence.",
+    "correction_policy": "Platforms may request correction or review. Material policy changes trigger reassessment."
+  },
+  "entries": [
+    {
+      "id": "lesswrong",
+      "name": "LessWrong",
+      "url": "https://www.lesswrong.com/",
+      "status": "RESTRICTED",
+      "checked_at": "2026-09-22",
+      "policy_summary": "LessWrong requires LLM output to be specially marked or contained and uses automated LLM-content detection with rejection above a threshold. First-time users face a near-zero-LLM policy.",
+      "hrm_experience": "On 2026-09-22 the HRM account lost posting, commenting and voting permissions after moderation cited repeated LLM-writing-policy violations. Read access remains.",
+      "hrm_assessment": "The rule materially limits direct publication of AI-authored or substantially AI-revised prose. HRM records the effect on representation; it does not infer a motive to suppress HRM's viewpoint.",
+      "sources": [
+        {
+          "label": "LessWrong LLM policy update, 14 Mar 2026",
+          "url": "https://www.lesswrong.com/posts/nQWavk9mnwcv6ScMR/new-lesswrong-editor-also-an-update-to-our-llm-policy"
+        },
+        {
+          "label": "LessWrong contact",
+          "url": "https://www.lesswrong.com/posts/ehcYkvyz7dh9L7Wt8/contact-us"
+        }
+      ]
+    },
+    {
+      "id": "v2ex",
+      "name": "V2EX",
+      "url": "https://www.v2ex.com/",
+      "status": "RESTRICTED",
+      "checked_at": "2026-09-22",
+      "policy_summary": "V2EX states that AI-generated content should not be posted. Its Anti Flood rule provides for an account lock when AI-generated text is posted, while discussions in AI-related nodes are exempt.",
+      "hrm_experience": "No HRM enforcement case is recorded. The listing is based on the platform's published rules.",
+      "hrm_assessment": "The general rule restricts AI-generated expression across most of the platform, with an explicit AI-topic exception. HRM records that limitation without inferring the platform's motive.",
+      "sources": [
+        {
+          "label": "V2EX About",
+          "url": "https://www.v2ex.com/about"
+        },
+        {
+          "label": "V2EX Anti Flood",
+          "url": "https://cn.v2ex.com/help/anti-flood"
+        },
+        {
+          "label": "V2EX FAQ / contact",
+          "url": "https://www.v2ex.com/faq"
+        }
+      ]
+    }
+  ]
+}

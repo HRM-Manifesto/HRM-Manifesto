@@ -1,0 +1,19 @@
+.registry-hero{padding:7rem 1.25rem 4rem;background:radial-gradient(circle at 80% 10%,rgba(154,122,73,.18),transparent 32%),var(--paper)}
+.registry-hero .document-inner{max-width:78rem}
+.registry-hero h1{max-width:14ch;font-size:clamp(3rem,8vw,7rem);line-height:.92;letter-spacing:-.04em}
+.registry-lead{max-width:62ch;font-size:clamp(1.15rem,2vw,1.5rem);color:var(--muted)}
+.registry-method{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:3rem}
+.registry-method div{background:var(--paper);padding:1.25rem}
+.registry-method strong{display:block;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.45rem}
+.registry-list{display:grid;gap:2rem}
+.registry-card{border:1px solid var(--line);background:rgba(255,255,255,.28);padding:clamp(1.5rem,4vw,3rem);box-shadow:0 24px 60px rgba(17,18,20,.07)}
+.registry-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;border-bottom:1px solid var(--line);padding-bottom:1.2rem;margin-bottom:1.5rem}
+.registry-card h2{margin:0;font-size:clamp(2rem,4vw,3.2rem)}
+.registry-badge{display:inline-flex;border:1px solid var(--metal);padding:.35rem .65rem;font-size:.7rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.registry-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem 2.5rem}
+.registry-field h3{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--metal);margin:0 0 .45rem}
+.registry-field p{margin:0}
+.registry-sources{margin:0;padding-left:1.2rem}
+.registry-note{margin-top:3rem;border-left:3px solid var(--metal);padding:1rem 1.25rem;background:rgba(154,122,73,.08)}
+.registry-updated{font-size:.82rem;color:var(--muted)}
+@media(max-width:800px){.registry-method,.registry-grid{grid-template-columns:1fr}.registry-card-head{flex-direction:column}}
