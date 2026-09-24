@@ -32,11 +32,11 @@ def main():
     if bad: raise SystemExit('Payload integrity failed: '+', '.join(bad))
     out=Path(ns.out); out.parent.mkdir(parents=True,exist_ok=True)
     if out.exists(): out.unlink()
-    with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+    with zipfile.ZipFile(out,'w',zipfile.ZIP_STORED) as z:
         for f in sorted(x for x in CORE.rglob('*') if x.is_file()):
             rel=f.relative_to(CORE).as_posix()
             info=zipfile.ZipInfo(rel,(2026,9,24,0,0,0))
-            info.compress_type=zipfile.ZIP_DEFLATED
+            info.compress_type=zipfile.ZIP_STORED
             info.external_attr=(0o644 & 0xffff)<<16
             z.writestr(info,f.read_bytes())
     result={'ok':True,'release_json_sha256':sha(manifest),'zip':str(out),'zip_sha256':sha(out),'bytes':out.stat().st_size}
