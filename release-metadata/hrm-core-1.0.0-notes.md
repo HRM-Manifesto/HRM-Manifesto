@@ -8,7 +8,7 @@ This release is a preservation package for the existing HRM founding corpus. It 
 Verification:
 - verify `release.json.minisig` against `HRM_FOUNDER.pub` using Minisign;
 - verify every payload SHA-256 declared in `release.json`;
-- signed package SHA-256 is recorded in `release-metadata/hrm-core-1.0.0.json`.
+- the transport ZIP SHA-256 is published as a separate `.sha256` release asset; identity/provenance is anchored by the signed `release.json` and its payload hashes.
 
 Founder Minisign public key ID: `9C609B0EBE5470DB`.
 

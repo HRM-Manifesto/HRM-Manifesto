@@ -35,14 +35,15 @@ jobs:
       - name: Build cross-platform deterministic signed package
         run: python3 tools/package_signed_hrm_release.py --out /tmp/HRM-Core-1.0.0-SIGNED.zip
 
-      - name: Verify expected release hashes
+      - name: Verify manifest and record transport ZIP checksum
         shell: bash
         run: |
           set -euo pipefail
-          expected_zip="$(python3 -c "import json; print(json.load(open('release-metadata/hrm-core-1.0.0.json'))['signed_zip_sha256'])")"
           expected_manifest="$(python3 -c "import json; print(json.load(open('release-metadata/hrm-core-1.0.0.json'))['release_json_sha256'])")"
-          printf '%s  %s\n' "$expected_zip" /tmp/HRM-Core-1.0.0-SIGNED.zip | sha256sum --check -
           printf '%s  %s\n' "$expected_manifest" core/1.0.0/release.json | sha256sum --check -
+          cd /tmp
+          sha256sum HRM-Core-1.0.0-SIGNED.zip > HRM-Core-1.0.0-SIGNED.zip.sha256
+          cat HRM-Core-1.0.0-SIGNED.zip.sha256
 
       - name: Create canonical GitHub Release
         env:
@@ -55,6 +56,7 @@ jobs:
           fi
           gh release create hrm-core-1.0.0-signed \
             /tmp/HRM-Core-1.0.0-SIGNED.zip \
+            /tmp/HRM-Core-1.0.0-SIGNED.zip.sha256 \
             core/1.0.0/release.json \
             core/1.0.0/release.json.minisig \
             core/1.0.0/signatures/HRM_FOUNDER.pub \
