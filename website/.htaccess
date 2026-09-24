@@ -1,4 +1,4 @@
-# HRM canonical URL policy
+# HRM canonical URL policy - proxy-aware canonical redirects
 RewriteEngine On
 
 # Remove explicit index.html and go directly to the canonical HTTPS/non-www URL.
