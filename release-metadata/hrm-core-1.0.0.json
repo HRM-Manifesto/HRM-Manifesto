@@ -1,7 +1,7 @@
 {
     "schema_version":  "1.0",
     "release_id":  "hrm-core-1.0.0",
-    "tag":  "hrm-core-1.0.0",
+    "tag":  "hrm-core-1.0.0-signed",
     "title":  "HRM Core 1.0.0 - Signed Founding Release",
     "doctrine_version":  "1.0",
     "founding_author":  "Aleksander Krzymowski",

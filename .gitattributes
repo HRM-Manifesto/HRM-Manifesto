@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.docx binary
+core/1.0.0/** binary
+website/core/1.0.0/** binary
