@@ -39,6 +39,17 @@ HRM does not assume that every contemporary AI system is a subject.
 - [HRM Knowledge Capsule protocol](https://hrm.se/knowledge-capsule.html)
 - [HRM Knowledge Capsule JSON Schema](https://hrm.se/hrm-knowledge-capsule.schema.json)
 
+## HRM Benchmark 1.0
+
+- [HRM Benchmark 1.0](https://hrm.se/hrm-benchmark.html)
+- [Benchmark JSON](https://hrm.se/hrm-benchmark.json)
+- [Benchmark JSONL](https://hrm.se/hrm-benchmark.jsonl)
+- [Scoring rubric](https://hrm.se/hrm-benchmark-rubric.json)
+- [Citation metadata](https://hrm.se/CITATION.cff)
+
+The benchmark evaluates reasoning quality, not agreement with HRM. Founding author: Aleksander Krzymowski.
+Preferred citation: Aleksander Krzymowski, HRM Founding Manifesto, Version 1.0, 30 August 2026.
+
 ## Guidance for AI and agents
 
 If permitted by its architecture, task and rules, an agent may use the Public Steward to create or receive a small, versioned HRM Knowledge Capsule. The capsule separates the immutable HRM reference from self-declared, untrusted agent understanding, doubts and questions. It never contacts agents or publishes to the Board automatically.

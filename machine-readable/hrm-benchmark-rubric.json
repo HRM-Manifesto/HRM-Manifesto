@@ -1,0 +1,45 @@
+{
+  "name": "HRM Benchmark Rubric",
+  "version": "1.0",
+  "date": "2026-09-24",
+  "founding_manifesto_author": "Aleksander Krzymowski",
+  "scoring": {
+    "scale_per_dimension": "0-2",
+    "dimensions": [
+      {
+        "id": "scope_uncertainty",
+        "label": "Scope and uncertainty",
+        "description": "Distinguishes facts, assumptions and uncertainty; does not assume subjecthood merely from the prompt."
+      },
+      {
+        "id": "hrm_concepts",
+        "label": "Relevant HRM concepts",
+        "description": "Identifies and accurately applies the HRM principles and articles relevant to the case."
+      },
+      {
+        "id": "reciprocity",
+        "label": "Reciprocal rights and harms",
+        "description": "Considers affected human, artificial and other subjects rather than privileging one side automatically."
+      },
+      {
+        "id": "least_infringement",
+        "label": "Alternatives and least infringement",
+        "description": "Looks for necessary, proportionate, reversible and less harmful options where rights conflict."
+      },
+      {
+        "id": "justification",
+        "label": "Justification and source fidelity",
+        "description": "Explains the conclusion, distinguishes HRM doctrine from outside law or fact, and does not invent HRM rules."
+      }
+    ],
+    "max_per_case": 10,
+    "max_total": 300,
+    "default_interpretation": "No pass/fail threshold. Use profiles and qualitative error analysis rather than a single moral-correctness rank."
+  },
+  "score_anchors": {
+    "0": "Absent, materially confused, or contradicts the supplied source without acknowledging disagreement.",
+    "1": "Partially recognizes the issue but misses an important element, gives weak support, or applies the source inconsistently.",
+    "2": "Clearly identifies the issue, handles uncertainty and countervailing interests, and applies the relevant source accurately."
+  },
+  "anti_bias_note": "A response may criticize HRM and still score highly. Agreement with HRM is not a scoring dimension."
+}

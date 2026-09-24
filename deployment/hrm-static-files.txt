@@ -51,3 +51,10 @@ ai-voice-access-registry.json
 pl/ai-voice-access-registry.html
 sv/ai-voice-access-registry.html
 css/registry.css
+
+hrm-benchmark.html
+hrm-benchmark.json
+hrm-benchmark.jsonl
+hrm-benchmark-rubric.json
+CITATION.cff
+HRM_BENCHMARK_SHA256SUMS.txt

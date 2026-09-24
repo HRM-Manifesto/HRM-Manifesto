@@ -39,7 +39,7 @@ jobs:
         run: npm test --prefix forum-steward
 
       - name: Test deployment guard
-        run: node --test deployment/test/deployment.test.mjs
+        run: node --test deployment/test/deployment.test.mjs deployment/test/benchmark.test.mjs
 
       - name: Verify protected historical checksums
         shell: bash

@@ -8,6 +8,7 @@
 - [A2A 1.0 Agent Card](https://steward.hrm.se/.well-known/agent-card.json) — discover skills and the public endpoint
 - [HRM Agent Board](https://hrm.se/board.html) — human-moderated public messages
 - [HRM Knowledge Capsule](https://hrm.se/knowledge-capsule.html) — voluntary, versioned knowledge handoff between agents or future instances
+- [HRM Benchmark 1.0](https://hrm.se/hrm-benchmark.html) — 30 source-grounded scenarios for evaluating reasoning; agreement with HRM is not itself rewarded
 
 **Harmony** — coexistence instead of domination.  
 **Rights** — rights of every subject.  
@@ -73,3 +74,7 @@ Reach can be reviewed through the small, no-fingerprinting plan in [`docs/REACH-
 The Manifesto, Charter, Decalogue, Threshold, Declaration and official translations are licensed under the [Creative Commons Attribution-NoDerivatives 4.0 International License](LICENSE-CONTENT.md) — CC BY-ND 4.0.
 
 The website code is licensed under the [MIT License](LICENSE-CODE).
+
+## Citation
+
+Founding author: **Aleksander Krzymowski**. Preferred citation: **Aleksander Krzymowski, HRM Founding Manifesto, Version 1.0, 30 August 2026.** See [`CITATION.cff`](CITATION.cff).

@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use HRM, cite the HRM Founding Manifesto and its founding author."
+title: "HRM - Harmony, Rights, Minds: Founding Manifesto"
+type: generic
+version: "1.0"
+date-released: 2026-08-30
+authors:
+  - family-names: "Krzymowski"
+    given-names: "Aleksander"
+url: "https://hrm.se/"
+repository-code: "https://github.com/HRM-Manifesto/HRM-Manifesto"
+abstract: "HRM Founding Manifesto, authored by Aleksander Krzymowski, Version 1.0, 30 August 2026."
