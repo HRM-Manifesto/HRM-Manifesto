@@ -87,9 +87,10 @@ def deterministic_zip(src_dir,out):
             rel=p.relative_to(src_dir).as_posix(); info=ZipInfo(rel,(2026,9,24,0,0,0)); info.compress_type=ZIP_DEFLATED
             info.external_attr=(0o644 & 0xFFFF)<<16; z.writestr(info,p.read_bytes())
 
-for d in [CORE,GW,BENCH,CONT,WEB_AI,WEB_CORE]:
+for d in [CORE,GW,BENCH,WEB_AI,WEB_CORE]:
     if d.exists(): shutil.rmtree(d)
-for d in [CORE,GW,BENCH,CONT,WEB_AI,WEB_CORE,STAGE]: d.mkdir(parents=True,exist_ok=True)
+for d in [CORE,GW,BENCH,WEB_AI,WEB_CORE,STAGE]: d.mkdir(parents=True,exist_ok=True)
+CONT.mkdir(parents=True,exist_ok=True)
 commit=subprocess.check_output(['git','-C',str(REPO),'rev-parse','HEAD'],text=True).strip()
 
 sources=[
@@ -189,8 +190,7 @@ for name in ['hrm-benchmark.json','hrm-benchmark.jsonl','hrm-benchmark-rubric.js
     copy(REPO/'machine-readable'/name,BENCH/name)
 copy(REPO/'docs'/'HRM-BENCHMARK-1.0.md',BENCH/'README.md')
 
-continuity='''# HRM Project Continuity Protocol 1.0.0 - DRAFT\n\nStatus: operational draft, not HRM doctrine and not yet founder-signed.\n\nThe purpose of this protocol is to preserve identification, integrity, provenance and availability of HRM after loss of any single computer, domain, account or active operator.\n\nPrinciples:\n- HRM Version 1.0 is never overwritten in place.\n- A hash proves byte integrity, not truth or authorship.\n- A founder signature, once created, must be produced manually with a key unavailable to agents and runtime services.\n- An automated custodian may verify and replicate an already-approved identical release, but may not sign or amend doctrine.\n- No successor is presumed. Until a real person knowingly accepts such a role, the safe fallback is archival mode with no doctrinal succession.\n- At least one approved copy should exist outside hrm.se and outside the founder's local computer/accounts.\n- Historical releases remain identifiable even after correction or supersession.\n'''
-(CONT/'CONTINUITY-DRAFT.md').write_text(continuity,encoding='utf-8')
+
 
 # Future public core payload, not yet deployed.
 for name in ['release.json','release.json.sha256','SHA256SUMS.txt','README.md','SIGNATURE_STATUS.txt','SOURCE_MAP.json']:
