@@ -1,0 +1,23 @@
+{
+    "schema_version":  "1.0",
+    "protocol_version":  "1.0.0",
+    "status":  "ACTIVE_OPERATIONAL",
+    "activated_at":  "2026-09-24T20:38:29.4350824+02:00",
+    "doctrine_changed":  false,
+    "core_release":  "hrm-core-1.0.0",
+    "core_release_json_sha256":  "1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553",
+    "founder_key_id":  "9C609B0EBE5470DB",
+    "github_release":  "https://github.com/HRM-Manifesto/HRM-Manifesto/releases/tag/hrm-core-1.0.0-signed",
+    "public_gateway":  "https://hrm.se/ai/",
+    "public_core":  "https://hrm.se/core/1.0.0/",
+    "independent_archive":  {
+                                "service":  "Software Heritage",
+                                "status":  "SUCCEEDED",
+                                "swhid":  "swh:1:snp:516ef481fb1260facde4acaffe28155c0901a0a4"
+                            },
+    "zenodo":  {
+                   "status":  "OPTIONAL",
+                   "required":  false
+               },
+    "routine_founder_action":  "NONE"
+}
