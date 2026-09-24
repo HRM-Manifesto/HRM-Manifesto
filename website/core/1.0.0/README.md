@@ -1,6 +1,7 @@
 # HRM Core 1.0.0
 
-Status: **unsigned release candidate for founder approval**.
+Status rule: this package is a release candidate unless and until the exact 
+elease.json bytes have a valid founder Minisign signature. No payload file is modified after signing.
 
 This package freezes the already-existing HRM Version 1.0 sources. It does not amend, summarize or reinterpret the doctrine.
 

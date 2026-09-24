@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "gateway_version": "1.0.0",
   "core_release": "hrm-core-1.0.0",
-  "core_release_sha256": "cf7b9e439a63592321f9e6c99d5b550ee905e49cc992c9c95576dccdf9b2c4df",
+  "core_release_sha256": "1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553",
   "founding_author": "Aleksander Krzymowski",
   "doctrine_version": "1.0",
   "language_policy": {

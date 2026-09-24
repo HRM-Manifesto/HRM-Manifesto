@@ -123,7 +123,7 @@ for lang,name in [('pl','HRM_Manifest_Wersja_1.0_PL.docx'),('en','HRM_Manifesto_
     units.extend(group_units(paras,lang,src_rel,sh))
 write_json(CORE/'EXTRACTION_MAP.json',{'schema_version':'1.0','status':'technical_extraction_not_a_new_doctrinal_text','items':extracted})
 
-readme='''# HRM Core 1.0.0\n\nStatus: **unsigned release candidate for founder approval**.\n\nThis package freezes the already-existing HRM Version 1.0 sources. It does not amend, summarize or reinterpret the doctrine.\n\nLanguage status: Polish = original; English = canonical translation; Swedish = additional official translation.\n\n`source/` contains copied source files. `extracted/` contains machine-readable technical extractions from the DOCX files and is not an independent doctrinal source. `SOURCE_MAP.json`, `release.json` and `SHA256SUMS.txt` provide provenance and integrity metadata.\n\nA future founder signature must cover the exact bytes of `release.json`. The automated system must never possess the founder signing key.\n'''
+readme='''# HRM Core 1.0.0\n\nStatus rule: this package is a release candidate unless and until the exact elease.json bytes have a valid founder Minisign signature. No payload file is modified after signing.\n\nThis package freezes the already-existing HRM Version 1.0 sources. It does not amend, summarize or reinterpret the doctrine.\n\nLanguage status: Polish = original; English = canonical translation; Swedish = additional official translation.\n\n`source/` contains copied source files. `extracted/` contains machine-readable technical extractions from the DOCX files and is not an independent doctrinal source. `SOURCE_MAP.json`, `release.json` and `SHA256SUMS.txt` provide provenance and integrity metadata.\n\nA future founder signature must cover the exact bytes of `release.json`. The automated system must never possess the founder signing key.\n'''
 (CORE/'README.md').write_text(readme,encoding='utf-8')
 (CORE/'SIGNATURE_STATUS.txt').write_text('UNSIGNED - awaiting explicit founder review and digital signature.\n',encoding='utf-8')
 
@@ -132,7 +132,7 @@ for p in sorted(x for x in CORE.rglob('*') if x.is_file() and x.name not in {'re
     payload.append({'path':p.relative_to(CORE).as_posix(),'bytes':p.stat().st_size,'sha256':sha(p)})
 release={'schema_version':'1.0','release_id':'hrm-core-1.0.0','release_type':'core_package','package_version':'1.0.0','doctrine_version':'1.0',
          'founding_author':'Aleksander Krzymowski','doctrine_date':'2026-08-30','built_at':datetime.datetime.now().astimezone().isoformat(),
-         'source_commit':commit,'signature_status':'unsigned_pending_founder_signature','signature_key_id':None,
+         'source_commit':commit,'signature':{'scheme':'minisign-ed25519','covers':'exact release.json bytes','artifact':'release.json.minisig','status_rule':'valid only when the external signature verifies against a trusted founder public key'},
          'language_policy':{'original':'pl','canonical':'en','additional_official':['sv']},'payload':payload}
 write_json(CORE/'release.json',release)
 (CORE/'release.json.sha256').write_text(sha(CORE/'release.json')+'  release.json\n',encoding='ascii')

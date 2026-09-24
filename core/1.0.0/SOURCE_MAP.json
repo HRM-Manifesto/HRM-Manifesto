@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "doctrine_version": "1.0",
   "package_version": "1.0.0",
-  "source_commit": "96de52a9a7ef953ac3bfac1a2e0aa6793bf74101",
+  "source_commit": "e40203a5b062df4ce3f8c4fa0292908d4e3da682",
   "author": "Aleksander Krzymowski",
   "language_policy": {
     "original": "pl",

@@ -6,10 +6,14 @@
   "doctrine_version": "1.0",
   "founding_author": "Aleksander Krzymowski",
   "doctrine_date": "2026-08-30",
-  "built_at": "2026-09-24T18:33:35.274369+02:00",
-  "source_commit": "96de52a9a7ef953ac3bfac1a2e0aa6793bf74101",
-  "signature_status": "unsigned_pending_founder_signature",
-  "signature_key_id": null,
+  "built_at": "2026-09-24T18:59:36.124893+02:00",
+  "source_commit": "e40203a5b062df4ce3f8c4fa0292908d4e3da682",
+  "signature": {
+    "scheme": "minisign-ed25519",
+    "covers": "exact release.json bytes",
+    "artifact": "release.json.minisig",
+    "status_rule": "valid only when the external signature verifies against a trusted founder public key"
+  },
   "language_policy": {
     "original": "pl",
     "canonical": "en",
@@ -70,8 +74,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 732,
-      "sha256": "95d3baac56fc9b0da3fca64a5e29dcf77d5a235293b5b516fbc83538682ed045"
+      "bytes": 851,
+      "sha256": "e3a6ba486cc26f8dca712d8840d81046b9c2e0614b1751087b3e998f1efa90eb"
     },
     {
       "path": "SIGNATURE_STATUS.txt",
@@ -121,7 +125,7 @@
     {
       "path": "SOURCE_MAP.json",
       "bytes": 3644,
-      "sha256": "d4c68675f5c8681b776330f645c9ebbe9256e7ea311bd1ef6585c44c126ee61e"
+      "sha256": "02ea1860203a9b948046977d9d437a50b8f218ffa181106a5c6c4e95872953ce"
     }
   ]
 }
