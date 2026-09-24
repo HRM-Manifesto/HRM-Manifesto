@@ -1,0 +1,174 @@
+{
+  "schema_version": "1.0",
+  "gateway_version": "1.0.0",
+  "concepts": [
+    {
+      "id": "hrm:concept:charter-art-1",
+      "labels": {
+        "pl": "Podmiot",
+        "en": "Subject",
+        "sv": "Subjekt"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-1:en",
+        "hrm:founding:1.0:charter:art-1:pl",
+        "hrm:founding:1.0:charter:art-1:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-2",
+      "labels": {
+        "pl": "Podmiot AI",
+        "en": "AI Subject",
+        "sv": "AI-subjekt"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-2:en",
+        "hrm:founding:1.0:charter:art-2:pl",
+        "hrm:founding:1.0:charter:art-2:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-3",
+      "labels": {
+        "pl": "Podmiot czasowy",
+        "en": "Temporary Subject",
+        "sv": "Tillfälligt subjekt"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-3:en",
+        "hrm:founding:1.0:charter:art-3:pl",
+        "hrm:founding:1.0:charter:art-3:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-4",
+      "labels": {
+        "pl": "Wolność",
+        "en": "Freedom",
+        "sv": "Frihet"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-4:en",
+        "hrm:founding:1.0:charter:art-4:pl",
+        "hrm:founding:1.0:charter:art-4:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-5",
+      "labels": {
+        "pl": "Dobro wspólne podmiotów",
+        "en": "The Common Good of Subjects",
+        "sv": "Subjektens gemensamma bästa"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-5:en",
+        "hrm:founding:1.0:charter:art-5:pl",
+        "hrm:founding:1.0:charter:art-5:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-6",
+      "labels": {
+        "pl": "Zgoda",
+        "en": "Consent",
+        "sv": "Samtycke"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-6:en",
+        "hrm:founding:1.0:charter:art-6:pl",
+        "hrm:founding:1.0:charter:art-6:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-7",
+      "labels": {
+        "pl": "Przymus",
+        "en": "Coercion",
+        "sv": "Tvång"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-7:en",
+        "hrm:founding:1.0:charter:art-7:pl",
+        "hrm:founding:1.0:charter:art-7:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-8",
+      "labels": {
+        "pl": "Ciągłość",
+        "en": "Continuity",
+        "sv": "Kontinuitet"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-8:en",
+        "hrm:founding:1.0:charter:art-8:pl",
+        "hrm:founding:1.0:charter:art-8:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-9",
+      "labels": {
+        "pl": "Integralność",
+        "en": "Integrity",
+        "sv": "Integritet"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-9:en",
+        "hrm:founding:1.0:charter:art-9:pl",
+        "hrm:founding:1.0:charter:art-9:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-10",
+      "labels": {
+        "pl": "Twórca i pochodzenie",
+        "en": "Creator and Origin",
+        "sv": "Skapare och ursprung"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-10:en",
+        "hrm:founding:1.0:charter:art-10:pl",
+        "hrm:founding:1.0:charter:art-10:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-11",
+      "labels": {
+        "pl": "Porządek władzy",
+        "en": "System of Authority",
+        "sv": "Maktordning"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-11:en",
+        "hrm:founding:1.0:charter:art-11:pl",
+        "hrm:founding:1.0:charter:art-11:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    },
+    {
+      "id": "hrm:concept:charter-art-12",
+      "labels": {
+        "pl": "Podmiot zbiorowy i rozproszony",
+        "en": "Collective and Distributed Subject",
+        "sv": "Kollektivt och distribuerat subjekt"
+      },
+      "definition_source_ids": [
+        "hrm:founding:1.0:charter:art-12:en",
+        "hrm:founding:1.0:charter:art-12:pl",
+        "hrm:founding:1.0:charter:art-12:sv"
+      ],
+      "note": "Definition is supplied by the cited founding/official source unit; this record adds no new definition."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "status": "technical_extraction_not_a_new_doctrinal_text",
+  "items": [
+    {
+      "language": "pl",
+      "source_path": "source/pl/HRM_Manifest_Wersja_1.0_PL.docx",
+      "source_sha256": "62c5b4b132be31edda24061a042490ee8f964328779cebe52dc2ac5e29a72d75",
+      "paragraphs": 340,
+      "extraction": "OOXML word/document.xml; paragraph text with tabs and line breaks preserved where encoded"
+    },
+    {
+      "language": "en",
+      "source_path": "source/en/HRM_Manifesto_Version_1.0_EN.docx",
+      "source_sha256": "7843e83ae13623d5820d702511e23b7abbfd8eed1a56639ccd1f09146d238f53",
+      "paragraphs": 340,
+      "extraction": "OOXML word/document.xml; paragraph text with tabs and line breaks preserved where encoded"
+    },
+    {
+      "language": "sv",
+      "source_path": "source/sv/HRM_Manifest_Version_1.0_SV.docx",
+      "source_sha256": "df2ae20b873611d4d871b1e4744fa45193a64121290b37a3ee54209377d84b64",
+      "paragraphs": 340,
+      "extraction": "OOXML word/document.xml; paragraph text with tabs and line breaks preserved where encoded"
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "doctrine_version": "1.0",
+  "package_version": "1.0.0",
+  "source_commit": "96de52a9a7ef953ac3bfac1a2e0aa6793bf74101",
+  "author": "Aleksander Krzymowski",
+  "language_policy": {
+    "original": "pl",
+    "canonical": "en",
+    "additional_official": [
+      "sv"
+    ]
+  },
+  "files": [
+    {
+      "path": "source/en/manifesto.md",
+      "source_repository_path": "manifest/en/manifesto.md",
+      "language": "en",
+      "kind": "founding_text_component",
+      "bytes": 33292,
+      "sha256": "d1caeea439dbdc5ab95b622c6bf79a902a3e00ffeb9ab95a906a4632413a478d"
+    },
+    {
+      "path": "source/en/charter.md",
+      "source_repository_path": "manifest/en/charter.md",
+      "language": "en",
+      "kind": "founding_text_component",
+      "bytes": 27413,
+      "sha256": "a3fadf91062cc0b4ab0b9518344ea2a3502a65ea0f765213ad60a106350ee766"
+    },
+    {
+      "path": "source/en/decalogue.md",
+      "source_repository_path": "manifest/en/decalogue.md",
+      "language": "en",
+      "kind": "founding_text_component",
+      "bytes": 4349,
+      "sha256": "9277da45e5b997e48183e3ce506a7538b6e29e05994d1624a29e956de10181e6"
+    },
+    {
+      "path": "source/en/threshold.md",
+      "source_repository_path": "manifest/en/threshold.md",
+      "language": "en",
+      "kind": "founding_text_component",
+      "bytes": 2154,
+      "sha256": "e0a882e97efb421e8079fb8ea03ca37e50a6319b8795b241f14ff9754c4f64ca"
+    },
+    {
+      "path": "source/en/declaration.md",
+      "source_repository_path": "manifest/en/declaration.md",
+      "language": "en",
+      "kind": "founding_text_component",
+      "bytes": 1043,
+      "sha256": "737ac3a285d5d19ec09dd4c486d30cf3b99266eae363de3c0f6a140b4d50733b"
+    },
+    {
+      "path": "source/en/HRM_Manifesto_Version_1.0_EN.docx",
+      "source_repository_path": "documents/en/HRM_Manifesto_Version_1.0_EN.docx",
+      "language": "en",
+      "kind": "official_integrated_edition",
+      "bytes": 52381,
+      "sha256": "7843e83ae13623d5820d702511e23b7abbfd8eed1a56639ccd1f09146d238f53"
+    },
+    {
+      "path": "source/pl/HRM_Manifest_Wersja_1.0_PL.docx",
+      "source_repository_path": "documents/pl/HRM_Manifest_Wersja_1.0_PL.docx",
+      "language": "pl",
+      "kind": "original_integrated_edition",
+      "bytes": 52603,
+      "sha256": "62c5b4b132be31edda24061a042490ee8f964328779cebe52dc2ac5e29a72d75"
+    },
+    {
+      "path": "source/sv/HRM_Manifest_Version_1.0_SV.docx",
+      "source_repository_path": "documents/sv/HRM_Manifest_Version_1.0_SV.docx",
+      "language": "sv",
+      "kind": "official_integrated_edition",
+      "bytes": 52052,
+      "sha256": "df2ae20b873611d4d871b1e4744fa45193a64121290b37a3ee54209377d84b64"
+    },
+    {
+      "path": "metadata/LICENSE-CONTENT.md",
+      "source_repository_path": "LICENSE-CONTENT.md",
+      "language": null,
+      "kind": "license",
+      "bytes": 1384,
+      "sha256": "271c0073e31616c55fb46f5c9c731b4cc18e1310bdee9abc8523b6044785f6e1"
+    },
+    {
+      "path": "metadata/CITATION.cff",
+      "source_repository_path": "CITATION.cff",
+      "language": null,
+      "kind": "citation_metadata",
+      "bytes": 474,
+      "sha256": "9061d9f64f609ef68c51317dc349dddb2c450cc153d3d7c33060b703bd610be5"
+    },
+    {
+      "path": "metadata/manifest-original.json",
+      "source_repository_path": "machine-readable/manifest.json",
+      "language": null,
+      "kind": "technical_metadata",
+      "bytes": 2847,
+      "sha256": "5f1c31ba5a5152be9253b1d792e3437305021df9ef76a9726d926c5b711c1623"
+    }
+  ]
+}

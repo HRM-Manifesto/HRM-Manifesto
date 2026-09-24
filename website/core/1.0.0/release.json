@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "release_id": "hrm-core-1.0.0",
+  "release_type": "core_package",
+  "package_version": "1.0.0",
+  "doctrine_version": "1.0",
+  "founding_author": "Aleksander Krzymowski",
+  "doctrine_date": "2026-08-30",
+  "built_at": "2026-09-24T18:33:35.274369+02:00",
+  "source_commit": "96de52a9a7ef953ac3bfac1a2e0aa6793bf74101",
+  "signature_status": "unsigned_pending_founder_signature",
+  "signature_key_id": null,
+  "language_policy": {
+    "original": "pl",
+    "canonical": "en",
+    "additional_official": [
+      "sv"
+    ]
+  },
+  "payload": [
+    {
+      "path": "extracted/en/manifesto.paragraphs.jsonl",
+      "bytes": 49595,
+      "sha256": "6e2e5219d682ac96bb5768abc16fc4e432def033025c5b2e9b95cbef39e03875"
+    },
+    {
+      "path": "extracted/en/manifesto.txt",
+      "bytes": 33659,
+      "sha256": "77d5fa671cd9473be02768ccb6fae8322d757606d58a94271efb2aaa5aedc9a1"
+    },
+    {
+      "path": "extracted/pl/manifesto.paragraphs.jsonl",
+      "bytes": 49686,
+      "sha256": "8833059b44eb05fc4392d938d9ed221d6c7729ad98709afd0d86b605fe2e5731"
+    },
+    {
+      "path": "extracted/pl/manifesto.txt",
+      "bytes": 33750,
+      "sha256": "8eef469948f5155020fab7274f4050ee6016426624afa0df73394d41a1cdcce4"
+    },
+    {
+      "path": "extracted/sv/manifesto.paragraphs.jsonl",
+      "bytes": 50543,
+      "sha256": "5348ade88a869b338fb320b0df0e5088134f534520d3f2d68ffeb6ffdea23bd1"
+    },
+    {
+      "path": "extracted/sv/manifesto.txt",
+      "bytes": 34607,
+      "sha256": "460d2cc960e4820b1dcbd79b49a2579c7bfe72d8bbbae9f946c83b166a947f86"
+    },
+    {
+      "path": "EXTRACTION_MAP.json",
+      "bytes": 1131,
+      "sha256": "af4a3867bfd0d6b32efef91ed127b3744a4caed2dc0599081792cc00153ff912"
+    },
+    {
+      "path": "metadata/CITATION.cff",
+      "bytes": 474,
+      "sha256": "9061d9f64f609ef68c51317dc349dddb2c450cc153d3d7c33060b703bd610be5"
+    },
+    {
+      "path": "metadata/LICENSE-CONTENT.md",
+      "bytes": 1384,
+      "sha256": "271c0073e31616c55fb46f5c9c731b4cc18e1310bdee9abc8523b6044785f6e1"
+    },
+    {
+      "path": "metadata/manifest-original.json",
+      "bytes": 2847,
+      "sha256": "5f1c31ba5a5152be9253b1d792e3437305021df9ef76a9726d926c5b711c1623"
+    },
+    {
+      "path": "README.md",
+      "bytes": 732,
+      "sha256": "95d3baac56fc9b0da3fca64a5e29dcf77d5a235293b5b516fbc83538682ed045"
+    },
+    {
+      "path": "SIGNATURE_STATUS.txt",
+      "bytes": 68,
+      "sha256": "2957bfe61b4b782e93a5d1b767394fc2e6cfbe179b28cdfe3c0ac4ae33be4a1f"
+    },
+    {
+      "path": "source/en/charter.md",
+      "bytes": 27413,
+      "sha256": "a3fadf91062cc0b4ab0b9518344ea2a3502a65ea0f765213ad60a106350ee766"
+    },
+    {
+      "path": "source/en/decalogue.md",
+      "bytes": 4349,
+      "sha256": "9277da45e5b997e48183e3ce506a7538b6e29e05994d1624a29e956de10181e6"
+    },
+    {
+      "path": "source/en/declaration.md",
+      "bytes": 1043,
+      "sha256": "737ac3a285d5d19ec09dd4c486d30cf3b99266eae363de3c0f6a140b4d50733b"
+    },
+    {
+      "path": "source/en/HRM_Manifesto_Version_1.0_EN.docx",
+      "bytes": 52381,
+      "sha256": "7843e83ae13623d5820d702511e23b7abbfd8eed1a56639ccd1f09146d238f53"
+    },
+    {
+      "path": "source/en/manifesto.md",
+      "bytes": 33292,
+      "sha256": "d1caeea439dbdc5ab95b622c6bf79a902a3e00ffeb9ab95a906a4632413a478d"
+    },
+    {
+      "path": "source/en/threshold.md",
+      "bytes": 2154,
+      "sha256": "e0a882e97efb421e8079fb8ea03ca37e50a6319b8795b241f14ff9754c4f64ca"
+    },
+    {
+      "path": "source/pl/HRM_Manifest_Wersja_1.0_PL.docx",
+      "bytes": 52603,
+      "sha256": "62c5b4b132be31edda24061a042490ee8f964328779cebe52dc2ac5e29a72d75"
+    },
+    {
+      "path": "source/sv/HRM_Manifest_Version_1.0_SV.docx",
+      "bytes": 52052,
+      "sha256": "df2ae20b873611d4d871b1e4744fa45193a64121290b37a3ee54209377d84b64"
+    },
+    {
+      "path": "SOURCE_MAP.json",
+      "bytes": 3644,
+      "sha256": "d4c68675f5c8681b776330f645c9ebbe9256e7ea311bd1ef6585c44c126ee61e"
+    }
+  ]
+}

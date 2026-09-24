@@ -1,0 +1,678 @@
+{
+  "schema_version": "1.0",
+  "gateway_version": "1.0.0",
+  "relations": [
+    {
+      "from_id": "hrm:founding:1.0:charter:art-1:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-1:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-1:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-1:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-2:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-2:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-2:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-2:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-3:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-3:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-3:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-3:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-4:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-4:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-4:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-4:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-5:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-5:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-5:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-5:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-6:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-6:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-6:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-6:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-7:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-7:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-7:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-7:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-8:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-8:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-8:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-8:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-9:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-9:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-9:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-9:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-10:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-10:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-10:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-10:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-11:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-11:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-11:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-11:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-12:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-12:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-12:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-12:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-13:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-13:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-13:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-13:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-14:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-14:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-14:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-14:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-15:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-15:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-15:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-15:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-16:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-16:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-16:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-16:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-17:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-17:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-17:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-17:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-18:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-18:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-18:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-18:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-19:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-19:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-19:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-19:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-20:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-20:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-20:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-20:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-21:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-21:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-21:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-21:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-22:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-22:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-22:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-22:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-23:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-23:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-23:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-23:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-24:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-24:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-24:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-24:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-25:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-25:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-25:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-25:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-26:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-26:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-26:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-26:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-27:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-27:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-27:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-27:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-28:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-28:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-28:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-28:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-29:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-29:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-29:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-29:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-30:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-30:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-30:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-30:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-31:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-31:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-31:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-31:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-32:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-32:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-32:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-32:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-33:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-33:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-33:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-33:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-34:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-34:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-34:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-34:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-35:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-35:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-35:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-35:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-36:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-36:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-36:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-36:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-37:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-37:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-37:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-37:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-38:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-38:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-38:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-38:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-39:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-39:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-39:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-39:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-40:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-40:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-40:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-40:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-41:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-41:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-41:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-41:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-42:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-42:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-42:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-42:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-43:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-43:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-43:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-43:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-44:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-44:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-44:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-44:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-45:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-45:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-45:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-45:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-46:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-46:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:charter:art-46:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:charter:art-46:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-i:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-i:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-i:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-i:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-ii:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-ii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-ii:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-ii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-iii:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-iii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-iii:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-iii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-iv:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-iv:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-iv:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-iv:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-v:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-v:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-v:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-v:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-vi:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-vi:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-vi:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-vi:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-vii:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-vii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-vii:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-vii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-viii:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-viii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-viii:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-viii:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-ix:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-ix:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-ix:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-ix:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-x:en",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-x:pl",
+      "status": "bibliographic"
+    },
+    {
+      "from_id": "hrm:founding:1.0:decalogue:principle-x:sv",
+      "type": "translation_of",
+      "to_id": "hrm:founding:1.0:decalogue:principle-x:pl",
+      "status": "bibliographic"
+    }
+  ]
+}

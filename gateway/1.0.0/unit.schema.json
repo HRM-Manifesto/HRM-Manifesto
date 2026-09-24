@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HRM Gateway Unit",
+  "type": "object",
+  "required": [
+    "id",
+    "logical_id",
+    "document_id",
+    "document_version",
+    "language",
+    "authority_class",
+    "text_exact",
+    "source_path",
+    "source_file_sha256",
+    "unit_sha256"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "logical_id": {
+      "type": "string"
+    },
+    "language": {
+      "enum": [
+        "pl",
+        "en",
+        "sv"
+      ]
+    },
+    "authority_class": {
+      "enum": [
+        "founding_text",
+        "official_translation"
+      ]
+    },
+    "text_exact": {
+      "type": "string"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unit_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
