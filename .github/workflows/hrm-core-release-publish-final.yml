@@ -1,0 +1,64 @@
+name: Publish HRM Core 1.0.0 Final
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out current verified tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Install Minisign
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y minisign
+
+      - name: Require core bytes identical to canonical signed tag
+        run: |
+          git fetch --tags --force
+          git diff --exit-code hrm-core-1.0.0-signed -- core/1.0.0
+
+      - name: Verify founder signature and payload hashes
+        run: python3 tools/verify_hrm_release.py core/1.0.0 --public-key core/1.0.0/signatures/HRM_FOUNDER.pub
+
+      - name: Build cross-platform deterministic signed package
+        run: python3 tools/package_signed_hrm_release.py --out /tmp/HRM-Core-1.0.0-SIGNED.zip
+
+      - name: Verify manifest and record transport ZIP checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_manifest="$(python3 -c "import json; print(json.load(open('release-metadata/hrm-core-1.0.0.json'))['release_json_sha256'])")"
+          printf '%s  %s\n' "$expected_manifest" core/1.0.0/release.json | sha256sum --check -
+          cd /tmp
+          sha256sum HRM-Core-1.0.0-SIGNED.zip > HRM-Core-1.0.0-SIGNED.zip.sha256
+          cat HRM-Core-1.0.0-SIGNED.zip.sha256
+
+      - name: Create canonical GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view hrm-core-1.0.0-signed >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to replace it.'
+            exit 1
+          fi
+          gh release create hrm-core-1.0.0-signed \
+            /tmp/HRM-Core-1.0.0-SIGNED.zip \
+            /tmp/HRM-Core-1.0.0-SIGNED.zip.sha256 \
+            core/1.0.0/release.json \
+            core/1.0.0/release.json.minisig \
+            core/1.0.0/signatures/HRM_FOUNDER.pub \
+            core/1.0.0/signatures/PUBLIC_KEY_SHA256.txt \
+            --title "HRM Core 1.0.0 — Signed Founding Release" \
+            --notes-file release-metadata/hrm-core-1.0.0-notes.md \
+            --verify-tag
