@@ -1,0 +1,52 @@
+name: Publish HRM Core Signed Release
+
+on:
+  push:
+    tags:
+      - 'hrm-core-1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out signed release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install Minisign
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y minisign
+
+      - name: Verify founder signature and payload hashes
+        run: python3 tools/verify_hrm_release.py --public-key core/1.0.0/signatures/HRM_FOUNDER.pub
+
+      - name: Build deterministic signed package
+        run: python3 tools/package_signed_hrm_release.py --out /tmp/HRM-Core-1.0.0-SIGNED.zip
+
+      - name: Verify expected release hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_zip="$(python3 -c "import json; print(json.load(open('release-metadata/hrm-core-1.0.0.json'))['signed_zip_sha256'])")"
+          expected_manifest="$(python3 -c "import json; print(json.load(open('release-metadata/hrm-core-1.0.0.json'))['release_json_sha256'])")"
+          printf '%s  %s\n' "$expected_zip" /tmp/HRM-Core-1.0.0-SIGNED.zip | sha256sum --check -
+          printf '%s  %s\n' "$expected_manifest" core/1.0.0/release.json | sha256sum --check -
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            /tmp/HRM-Core-1.0.0-SIGNED.zip \
+            core/1.0.0/release.json \
+            core/1.0.0/release.json.minisig \
+            core/1.0.0/signatures/HRM_FOUNDER.pub \
+            core/1.0.0/signatures/PUBLIC_KEY_SHA256.txt \
+            --title "HRM Core 1.0.0 — Signed Founding Release" \
+            --notes-file release-metadata/hrm-core-1.0.0-notes.md \
+            --verify-tag
