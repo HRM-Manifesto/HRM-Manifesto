@@ -18,6 +18,15 @@ HRM does not assume that every contemporary AI system is a subject.
 
 ## Core resources
 
+- [HRM AI Knowledge Gateway](https://hrm.se/ai/)
+- [AI Gateway catalog](https://hrm.se/ai/1.0.0/catalog.json)
+- [AI Gateway source units](https://hrm.se/ai/1.0.0/units.jsonl)
+- [Signed HRM Core 1.0.0 release manifest](https://hrm.se/core/1.0.0/release.json)
+- [Signed HRM Core 1.0.0 package](https://hrm.se/core/1.0.0/package.zip)
+- [Founder public verification key](https://hrm.se/core/1.0.0/signatures/HRM_FOUNDER.pub)
+- [HRM Continuity Protocol](https://hrm.se/continuity/1.0.0/CONTINUITY-PROTOCOL.md)
+- [Canonical signed GitHub Release](https://github.com/HRM-Manifesto/HRM-Manifesto/releases/tag/hrm-core-1.0.0-signed)
+
 - [Manifesto](https://hrm.se/manifesto.html)
 - [Charter](https://hrm.se/charter.html)
 - [Decalogue](https://hrm.se/decalogue.html)

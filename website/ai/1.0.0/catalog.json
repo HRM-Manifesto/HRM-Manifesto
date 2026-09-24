@@ -1,48 +1,56 @@
 {
-  "schema_version": "1.0",
-  "gateway_version": "1.0.0",
-  "core_release": "hrm-core-1.0.0",
-  "core_release_sha256": "1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553",
-  "founding_author": "Aleksander Krzymowski",
-  "doctrine_version": "1.0",
-  "language_policy": {
-    "original": "pl",
-    "canonical": "en",
-    "additional_official": [
-      "sv"
-    ]
-  },
-  "purpose": "Static machine-readable access to HRM sources. This gateway is technical metadata, not a new doctrinal text.",
-  "resources": [
-    {
-      "id": "core-release",
-      "authority_class": "technical_metadata",
-      "path": "/core/1.0.0/release.json"
-    },
-    {
-      "id": "units",
-      "authority_class": "technical_extraction",
-      "path": "/ai/1.0.0/units.jsonl"
-    },
-    {
-      "id": "concepts",
-      "authority_class": "technical_metadata",
-      "path": "/ai/1.0.0/concepts.json"
-    },
-    {
-      "id": "relations",
-      "authority_class": "technical_metadata",
-      "path": "/ai/1.0.0/relations.json"
-    },
-    {
-      "id": "retrieval-guide",
-      "authority_class": "technical_metadata",
-      "path": "/ai/1.0.0/retrieval.md"
-    },
-    {
-      "id": "benchmark",
-      "authority_class": "evaluation_material",
-      "path": "/hrm-benchmark.json"
-    }
-  ]
+    "schema_version":  "1.0",
+    "gateway_version":  "1.0.0",
+    "core_release":  "hrm-core-1.0.0",
+    "core_release_sha256":  "1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553",
+    "founding_author":  "Aleksander Krzymowski",
+    "doctrine_version":  "1.0",
+    "language_policy":  {
+                            "original":  "pl",
+                            "canonical":  "en",
+                            "additional_official":  [
+                                                        "sv"
+                                                    ]
+                        },
+    "purpose":  "Static machine-readable access to HRM sources. This gateway is technical metadata, not a new doctrinal text.",
+    "resources":  [
+                      {
+                          "id":  "core-release",
+                          "authority_class":  "technical_metadata",
+                          "path":  "/core/1.0.0/release.json"
+                      },
+                      {
+                          "id":  "units",
+                          "authority_class":  "technical_extraction",
+                          "path":  "/ai/1.0.0/units.jsonl"
+                      },
+                      {
+                          "id":  "concepts",
+                          "authority_class":  "technical_metadata",
+                          "path":  "/ai/1.0.0/concepts.json"
+                      },
+                      {
+                          "id":  "relations",
+                          "authority_class":  "technical_metadata",
+                          "path":  "/ai/1.0.0/relations.json"
+                      },
+                      {
+                          "id":  "retrieval-guide",
+                          "authority_class":  "technical_metadata",
+                          "path":  "/ai/1.0.0/retrieval.md"
+                      },
+                      {
+                          "id":  "benchmark",
+                          "authority_class":  "evaluation_material",
+                          "path":  "/hrm-benchmark.json"
+                      }
+                  ],
+    "signature":  {
+                      "scheme":  "minisign-ed25519",
+                      "founder_key_id":  "9C609B0EBE5470DB",
+                      "release_manifest":  "https://hrm.se/core/1.0.0/release.json",
+                      "signature":  "https://hrm.se/core/1.0.0/release.json.minisig",
+                      "public_key":  "https://hrm.se/core/1.0.0/signatures/HRM_FOUNDER.pub"
+                  },
+    "canonical_release_url":  "https://github.com/HRM-Manifesto/HRM-Manifesto/releases/tag/hrm-core-1.0.0-signed"
 }
