@@ -5,7 +5,11 @@ RewriteEngine On
 RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.html(?:[?\s]) [NC]
 RewriteRule ^(.*/)?index\.html$ https://hrm.se/$1 [R=301,L,NE]
 
-# Force HTTPS and the non-www canonical host while preserving the path/query.
-RewriteCond %{HTTPS} !=on [OR]
+# Force the canonical non-www host.
 RewriteCond %{HTTP_HOST} !^hrm\.se$ [NC]
+RewriteRule ^ https://hrm.se%{REQUEST_URI} [R=301,L,NE]
+
+# Force HTTPS, but respect TLS termination at a reverse proxy.
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !^https$ [NC]
 RewriteRule ^ https://hrm.se%{REQUEST_URI} [R=301,L,NE]
