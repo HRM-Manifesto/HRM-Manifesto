@@ -32,9 +32,9 @@
                       },
                       {
                           "independent":  true,
-                          "state":  "selected_not_archived",
+                          "state":  "archived_verified",
                           "id":  "software-heritage",
-                          "location":  "Software Heritage",
+                          "location":  "swh:1:snp:516ef481fb1260facde4acaffe28155c0901a0a4",
                           "kind":  "independent_source_archive"
                       },
                       {
