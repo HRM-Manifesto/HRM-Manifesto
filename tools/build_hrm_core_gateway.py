@@ -13,6 +13,10 @@ WEB_AI=REPO/'website'/'ai'
 WEB_CORE=REPO/'website'/'core'/'1.0.0'
 STAGE=ROOT/'Wydania'/'DO_ZATWIERDZENIA'
 REPORT=ROOT/'System'/'Reports'/'HRM_NEW_PHASE_CORE_GATEWAY_BUILD.json'
+
+# SIGNED CORE GUARD: never overwrite a founder-signed immutable release.
+if (CORE/'release.json.minisig').exists():
+    raise SystemExit('Refusing to rebuild HRM Core 1.0.0: founder signature exists. Create a new package version instead.')
 NS={'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 W='{%s}'%NS['w']
 

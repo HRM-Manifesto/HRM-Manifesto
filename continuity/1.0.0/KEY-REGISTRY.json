@@ -1,9 +1,18 @@
-﻿{
+{
     "schema_version":  "1.0",
-    "status":  "PENDING_FOUNDER_KEY",
+    "status":  "ACTIVE",
     "founder":  "Aleksander Krzymowski",
     "keys":  [
-
+                 {
+                     "key_id":  "9C609B0EBE5470DB",
+                     "scheme":  "minisign-ed25519",
+                     "public_key_file":  "HRM_FOUNDER.pub",
+                     "public_key_sha256":  "ee50b8c69262d5ace669fb8ed3e15a6d4573b8905380141aab95d52f32cb7207",
+                     "status":  "active",
+                     "first_release":  "hrm-core-1.0.0",
+                     "release_json_sha256":  "1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553",
+                     "private_key_location":  "NOT RECORDED BY PROJECT"
+                 }
              ],
     "rule":  "Only public keys and fingerprints belong here. Never store a private key or passphrase in HRM project files."
 }
