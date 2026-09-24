@@ -137,7 +137,7 @@ jobs:
           mkdir -p public-verify
           while IFS= read -r file; do
             mkdir -p "public-verify/$(dirname "$file")"
-            curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            curl --location --fail --silent --show-error --proto '=https' --tlsv1.2 \
               "https://hrm.se/$file?deployment=${{ github.run_id }}" \
               --output "public-verify/$file"
             cmp "payload/$file" "public-verify/$file"
