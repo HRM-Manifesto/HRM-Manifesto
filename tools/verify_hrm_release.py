@@ -9,7 +9,7 @@ def sha256(path):
 
 def main():
     ap=argparse.ArgumentParser(description='Verify HRM release integrity and optional Minisign signature')
-    ap.add_argument('release_dir', nargs='?', default=r'D:\MANIFEST\GitHub\HRM-Manifesto\core\1.0.0')
+    ap.add_argument('release_dir', nargs='?', default=str(Path(__file__).resolve().parents[1]/'core'/'1.0.0'))
     ap.add_argument('--public-key', dest='public_key')
     ns=ap.parse_args(); root=Path(ns.release_dir); manifest=root/'release.json'
     report={'release_dir':str(root),'integrity_ok':False,'signature':'not_checked','missing':[],'bad_hashes':[]}
