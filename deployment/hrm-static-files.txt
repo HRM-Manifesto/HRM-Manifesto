@@ -1,5 +1,10 @@
 # Paths are relative to website/. Only reviewed, non-doctrinal public files belong here.
 agents.html
+pl/agents.html
+sv/agents.html
+verify.html
+pl/verify.html
+sv/verify.html
 agents.md
 agents.txt
 ai-rights-and-subjecthood.html
@@ -32,6 +37,7 @@ css/board.css
 css/hrm.css
 css/hrm-visual3d.css
 css/hrm-inner3d.css
+css/hrm-v3.css
 index.html
 pl/index.html
 sv/index.html

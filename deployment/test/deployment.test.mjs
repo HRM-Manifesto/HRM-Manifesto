@@ -35,8 +35,8 @@ test('SEO deployment keeps technical resources out of the sitemap', async () => 
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/ai-rights-and-subjecthood\.html<\/loc><lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
   assert.doesNotMatch(sitemap, /hrm-knowledge-capsule\.schema\.json|agents\.txt|llms\.txt|manifest\.json/);
   assert.match(home, /"@type":"WebSite"/);
-  assert.match(home, /href="ai-rights-and-subjecthood\.html"/);
-  assert.match(home, /href="journal\/"/);
+  assert.match(home, /href="agents\.html"/);
+  assert.match(home, /href="verify\.html"/);
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/<\/loc><lastmod>2026-09-18<\/lastmod>/);
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/protect-possible-ai-subject\.html<\/loc><lastmod>2026-09-04<\/lastmod>/);
   for (const url of ['https://hrm.se/pl/journal/', 'https://hrm.se/sv/journal/']) {
@@ -117,36 +117,32 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
   assert.match(allowlist, /images\/threshold-duality\.svg/);
 });
 
-test('marketing question is simplified and inner pages share restrained depth effects', async () => {
+test('HRM.se 2.0 foregrounds durable Core, AI Gateway and verification in all three languages', async () => {
   const { readFile } = await import('node:fs/promises');
   const { default: path } = await import('node:path');
   const root = path.resolve(import.meta.dirname, '..', '..');
-
-  const pl = await readFile(path.join(root, 'website', 'pl', 'index.html'), 'utf8');
-  const en = await readFile(path.join(root, 'website', 'index.html'), 'utf8');
-  const sv = await readFile(path.join(root, 'website', 'sv', 'index.html'), 'utf8');
-  assert.match(pl, /hero-title-prefix">Człowiek i AI\.<\/span><span class="hero-title-question">Co, jeśli AI przestanie być tylko narzędziem\?/);
-  assert.match(en, /hero-title-prefix">Humans and AI\.<\/span><span class="hero-title-question">What if AI stops being just a tool\?/);
-  assert.match(sv, /hero-title-prefix">Människan och AI\.<\/span><span class="hero-title-question">Tänk om AI inte längre bara är ett verktyg\?/);
-  assert.match(pl, /class="menu-label"[^>]*>Menu<\/span>/);
-  assert.match(sv, /class="menu-label"[^>]*>Meny<\/span>/);
-
-  for (const page of [
-    'about.html',
-    'ai-rights-and-subjecthood.html',
-    'journal/index.html',
-    'pl/about.html',
-    'pl/journal/index.html',
-    'sv/about.html',
-    'sv/journal/index.html'
-  ]) {
-    const html = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
-    assert.match(html, /hrm-inner3d\.css\?v=20260918-v1/);
-    assert.match(html, /hrm-inner3d\.js\?v=20260918-v1/);
+  const pages = [
+    ['index.html', /A framework for coexistence between biological, digital and future subjects/],
+    ['pl/index.html', /Ramy współistnienia podmiotów biologicznych, cyfrowych i przyszłych/],
+    ['sv/index.html', /Ett ramverk för samexistens mellan biologiska, digitala och framtida subjekt/],
+  ];
+  for (const [page, headline] of pages) {
+    const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
+    assert.match(source, headline);
+    assert.match(source, /href="verify\.html"/);
+    assert.match(source, /href="agents\.html"/);
+    assert.match(source, /hrm-visual3d\.css\?v=20260918-v4/);
+    assert.match(source, /hrm-v3\.css\?v=20260924-v1/);
   }
-
-  const css = await readFile(path.join(root, 'website', 'css', 'hrm-inner3d.css'), 'utf8');
-  const js = await readFile(path.join(root, 'website', 'js', 'hrm-inner3d.js'), 'utf8');
-  assert.match(css, /prefers-reduced-motion:reduce/);
-  assert.match(js, /IntersectionObserver/);
+  for (const page of ['verify.html','pl/verify.html','sv/verify.html']) {
+    const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
+    assert.match(source, /1904f9b333a11c316f0e2acca391bcebb1c1f2072c98536b02162e405f374553/);
+    assert.match(source, /9C609B0EBE5470DB/);
+    assert.match(source, /swh:1:snp:516ef481fb1260facde4acaffe28155c0901a0a4/);
+  }
+  for (const page of ['agents.html','pl/agents.html','sv/agents.html']) {
+    const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
+    assert.match(source, /ai\/1\.0\.0\/catalog\.json/);
+    assert.match(source, /ai\/1\.0\.0\/units\.jsonl/);
+  }
 });

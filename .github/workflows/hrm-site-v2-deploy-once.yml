@@ -1,0 +1,110 @@
+name: HRM.se 2.0 Deploy Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hrm-site-v2-deploy-once.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hrm-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Test deployment rules
+        run: node --test deployment/test/deployment.test.mjs deployment/test/benchmark.test.mjs
+      - name: Protect founding distribution
+        run: sha256sum --check integrity/SHA256SUMS.txt
+      - name: Build exact HRM.se 2.0 payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf deployment/site-v2-dist
+          mkdir -p deployment/site-v2-dist
+          while IFS= read -r file; do
+            test -n "$file"
+            test -f "website/$file"
+            mkdir -p "deployment/site-v2-dist/$(dirname "$file")"
+            cp "website/$file" "deployment/site-v2-dist/$file"
+          done < deployment/hrm-site-v2-files.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hrm-site-v2-${{ github.run_id }}
+          path: deployment/site-v2-dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: hrm-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: hrm-site-v2-${{ github.run_id }}
+          path: payload
+      - name: Require FTPS secrets
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        run: |
+          test -n "$LOOPIA_FTPS_USERNAME"
+          test -n "$LOOPIA_FTPS_PASSWORD"
+      - name: Back up exact production targets
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup/files
+          : > backup/missing.txt
+          while IFS= read -r file; do
+            mkdir -p "backup/files/$(dirname "$file")"
+            set +e
+            curl --fail --silent --show-error --ftp-ssl-reqd --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" "ftp://ftpcluster.loopia.se/$file" --output "backup/files/$file"
+            rc=$?
+            set -e
+            if [ "$rc" -eq 9 ] || [ "$rc" -eq 78 ]; then
+              rm -f "backup/files/$file"
+              printf '%s\n' "$file" >> backup/missing.txt
+            elif [ "$rc" -ne 0 ]; then
+              exit "$rc"
+            fi
+          done < deployment/hrm-site-v2-files.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hrm-site-v2-backup-${{ github.run_id }}
+          path: backup/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Deploy HRM.se 2.0
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            curl --fail --silent --show-error --ftp-ssl-reqd --ftp-create-dirs --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" --upload-file "payload/$file" "ftp://ftpcluster.loopia.se/$file"
+          done < deployment/hrm-site-v2-files.txt
+      - name: Verify public HTTPS byte-for-byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public-verify
+          while IFS= read -r file; do
+            mkdir -p "public-verify/$(dirname "$file")"
+            curl --location --fail --silent --show-error --proto '=https' --tlsv1.2 "https://hrm.se/$file?deployment=${{ github.run_id }}" --output "public-verify/$file"
+            cmp "payload/$file" "public-verify/$file"
+          done < deployment/hrm-site-v2-files.txt
