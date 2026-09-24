@@ -1,4 +1,4 @@
-﻿{
+{
     "schema_version":  "1.0",
     "status":  "PLANNED",
     "locations":  [
@@ -17,18 +17,32 @@
                           "kind":  "local_release_candidate"
                       },
                       {
-                          "independent":  true,
+                          "independent":  false,
                           "state":  "not_created",
                           "id":  "github-release",
-                          "location":  "HRM-Manifesto/HRM-Manifesto release",
-                          "kind":  "public_release_repository"
+                          "location":  "HRM-Manifesto/HRM-Manifesto",
+                          "kind":  "canonical_public_release"
                       },
                       {
                           "independent":  true,
-                          "state":  "not_selected",
-                          "id":  "independent-archive",
-                          "location":  null,
-                          "kind":  "external_archive"
+                          "state":  "selected_not_created",
+                          "id":  "zenodo",
+                          "location":  "Zenodo",
+                          "kind":  "independent_release_deposit"
+                      },
+                      {
+                          "independent":  true,
+                          "state":  "selected_not_archived",
+                          "id":  "software-heritage",
+                          "location":  "Software Heritage",
+                          "kind":  "independent_source_archive"
+                      },
+                      {
+                          "independent":  false,
+                          "state":  "existing_site_new_release_not_published",
+                          "id":  "hrm-site",
+                          "location":  "https://hrm.se/",
+                          "kind":  "public_access_layer"
                       }
                   ],
     "release_id":  "hrm-core-1.0.0"

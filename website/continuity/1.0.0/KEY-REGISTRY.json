@@ -1,0 +1,9 @@
+﻿{
+    "schema_version":  "1.0",
+    "status":  "PENDING_FOUNDER_KEY",
+    "founder":  "Aleksander Krzymowski",
+    "keys":  [
+
+             ],
+    "rule":  "Only public keys and fingerprints belong here. Never store a private key or passphrase in HRM project files."
+}
