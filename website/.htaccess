@@ -1,0 +1,11 @@
+# HRM canonical URL policy
+RewriteEngine On
+
+# Remove explicit index.html and go directly to the canonical HTTPS/non-www URL.
+RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.html(?:[?\s]) [NC]
+RewriteRule ^(.*/)?index\.html$ https://hrm.se/$1 [R=301,L,NE]
+
+# Force HTTPS and the non-www canonical host while preserving the path/query.
+RewriteCond %{HTTPS} !=on [OR]
+RewriteCond %{HTTP_HOST} !^hrm\.se$ [NC]
+RewriteRule ^ https://hrm.se%{REQUEST_URI} [R=301,L,NE]

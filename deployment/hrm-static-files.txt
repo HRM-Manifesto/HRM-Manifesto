@@ -58,3 +58,4 @@ hrm-benchmark.jsonl
 hrm-benchmark-rubric.json
 CITATION.cff
 HRM_BENCHMARK_SHA256SUMS.txt
+.htaccess
