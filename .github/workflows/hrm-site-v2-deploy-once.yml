@@ -108,3 +108,5 @@ jobs:
             curl --location --fail --silent --show-error --proto '=https' --tlsv1.2 "https://hrm.se/$file?deployment=${{ github.run_id }}" --output "public-verify/$file"
             cmp "payload/$file" "public-verify/$file"
           done < deployment/hrm-site-v2-files.txt
+
+# retry after cross-platform checksum normalization
