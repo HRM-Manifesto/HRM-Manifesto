@@ -1,0 +1,55 @@
+name: HRM Canonical Redirect One-Off
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hrm-canonical-redirect-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-redirects:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: hrm-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Back up current production htaccess
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup
+          curl --fail --silent --show-error --ftp-ssl-reqd             --user "${{ secrets.LOOPIA_FTPS_USERNAME }}:${{ secrets.LOOPIA_FTPS_PASSWORD }}"             ftp://ftpcluster.loopia.se/.htaccess --output backup/.htaccess || true
+
+      - name: Save rollback artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hrm-htaccess-backup-${{ github.run_id }}
+          path: backup/
+          include-hidden-files: true
+          retention-days: 30
+
+      - name: Deploy canonical redirect rules
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --ftp-ssl-reqd             --user "${{ secrets.LOOPIA_FTPS_USERNAME }}:${{ secrets.LOOPIA_FTPS_PASSWORD }}"             --upload-file website/.htaccess             ftp://ftpcluster.loopia.se/.htaccess
+
+      - name: Verify canonical redirects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check() {
+            got="$(curl --silent --show-error --output /dev/null --max-redirs 0 --write-out '%{http_code} %{redirect_url}' "$1")"
+            test "$got" = "301 $2"
+          }
+
+          check 'http://hrm.se/' 'https://hrm.se/'
+          check 'http://www.hrm.se/' 'https://hrm.se/'
+          check 'https://www.hrm.se/' 'https://hrm.se/'
+          check 'https://hrm.se/index.html' 'https://hrm.se/'
+          check 'https://hrm.se/pl/index.html' 'https://hrm.se/pl/'
+          check 'https://hrm.se/sv/index.html' 'https://hrm.se/sv/'
+          test "$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' https://hrm.se/)" = '200'
