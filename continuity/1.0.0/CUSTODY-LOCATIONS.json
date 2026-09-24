@@ -1,0 +1,35 @@
+﻿{
+    "schema_version":  "1.0",
+    "status":  "PLANNED",
+    "locations":  [
+                      {
+                          "independent":  false,
+                          "state":  "present",
+                          "id":  "working-repository",
+                          "location":  "D:/MANIFEST/GitHub/HRM-Manifesto/core/1.0.0",
+                          "kind":  "local_working_copy"
+                      },
+                      {
+                          "independent":  false,
+                          "state":  "present",
+                          "id":  "staged-package",
+                          "location":  "D:/MANIFEST/Wydania/DO_ZATWIERDZENIA/HRM-Core-1.0.0-UNSIGNED.zip",
+                          "kind":  "local_release_candidate"
+                      },
+                      {
+                          "independent":  true,
+                          "state":  "not_created",
+                          "id":  "github-release",
+                          "location":  "HRM-Manifesto/HRM-Manifesto release",
+                          "kind":  "public_release_repository"
+                      },
+                      {
+                          "independent":  true,
+                          "state":  "not_selected",
+                          "id":  "independent-archive",
+                          "location":  null,
+                          "kind":  "external_archive"
+                      }
+                  ],
+    "release_id":  "hrm-core-1.0.0"
+}
