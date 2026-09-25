@@ -14,11 +14,35 @@ $event=strtolower((string)($data['event'] ?? ''));
 if (!in_array($event,$allowed,true)) { http_response_code(400); echo '{"ok":false}'; exit; }
 function ct($v,int $m=160):string{$v=trim((string)$v);$v=preg_replace('/[\x00-\x1F\x7F]/u','',$v) ?? '';return mb_substr($v,0,$m,'UTF-8');}
 function cp($v):string{$p=ct($v,240);if($p===''||$p[0]!=='/')return '/';$z=parse_url($p);return ct($z['path'] ?? '/',240);}
+function classify_client(string $ua):array{
+  $u=strtolower($ua);
+  $known=[
+    'oai-searchbot'=>'OAI-SearchBot',
+    'oai-adsbot'=>'OAI-AdsBot',
+    'chatgpt-user'=>'ChatGPT-User',
+    'gptbot'=>'GPTBot',
+    'claudebot'=>'ClaudeBot',
+    'claude-user'=>'Claude-User',
+    'perplexitybot'=>'PerplexityBot',
+    'googlebot'=>'Googlebot',
+    'bingbot'=>'Bingbot',
+    'applebot'=>'Applebot',
+    'amazonbot'=>'Amazonbot',
+    'bytespider'=>'Bytespider',
+    'meta-externalagent'=>'Meta-ExternalAgent',
+    'ccbot'=>'CCBot'
+  ];
+  foreach($known as $needle=>$label){if(str_contains($u,$needle))return ['bot',$label,'high'];}
+  if(preg_match('/bot|crawler|spider|slurp|headless|scrapy|python-requests|curl\\/|wget\\//',$u))return ['automation','Inny bot/crawler','medium'];
+  if($u==='')return ['unknown','','low'];
+  return ['browser','','low'];
+}
+[$clientKind,$agentLabel,$agentConfidence]=classify_client((string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
 $anon=ct($data['anon'] ?? '',100);$session=ct($data['session'] ?? '',100);
 if ($anon===''||$session==='') { http_response_code(400); echo '{"ok":false}'; exit; }
 $ref=ct($data['referrer'] ?? '',160);
 if($ref!==''){$h=parse_url(str_contains($ref,'://')?$ref:'https://'.$ref,PHP_URL_HOST);$ref=ct($h ?: '',120);}
-$item=['at'=>gmdate('c'),'event'=>$event,'visitor'=>hash('sha256','hrm-radar-v1|'.$anon),'session'=>hash('sha256','hrm-radar-session-v1|'.$session),'path'=>cp($data['path'] ?? '/'),'lang'=>in_array(($data['lang'] ?? ''),['pl','en','sv'],true)?$data['lang']:'other','source'=>ct($data['source'] ?? 'direct',80),'medium'=>ct($data['medium'] ?? '',80),'campaign'=>ct($data['campaign'] ?? '',100),'content'=>ct($data['content'] ?? '',100),'referrer'=>$ref,'visit_no'=>max(1,min(9999,(int)($data['visit_no'] ?? 1)))];
+$item=['at'=>gmdate('c'),'event'=>$event,'visitor'=>hash('sha256','hrm-radar-v1|'.$anon),'session'=>hash('sha256','hrm-radar-session-v1|'.$session),'path'=>cp($data['path'] ?? '/'),'lang'=>in_array(($data['lang'] ?? ''),['pl','en','sv'],true)?$data['lang']:'other','source'=>ct($data['source'] ?? 'direct',80),'medium'=>ct($data['medium'] ?? '',80),'campaign'=>ct($data['campaign'] ?? '',100),'content'=>ct($data['content'] ?? '',100),'referrer'=>$ref,'visit_no'=>max(1,min(9999,(int)($data['visit_no'] ?? 1))),'client_kind'=>$clientKind,'agent_label'=>$agentLabel,'agent_confidence'=>$agentConfidence];
 $dir=__DIR__.DIRECTORY_SEPARATOR.'data';
 if(!is_dir($dir)&&!mkdir($dir,0750,true)&&!is_dir($dir)){http_response_code(500);echo '{"ok":false}';exit;}
 $file=$dir.DIRECTORY_SEPARATOR.'events-'.gmdate('Y-m-d').'.jsonl';
