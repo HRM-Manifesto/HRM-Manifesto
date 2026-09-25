@@ -182,13 +182,36 @@ jobs:
                 .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
               esac
               mkdir -p "public-verify/$(dirname "$file")"
-              curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-                "https://hrm.se/$file?deployment=$GITHUB_RUN_ID" \
-                --output "public-verify/$file"
-              cmp "payload/$file" "public-verify/$file"
+              verified=0
+              for attempt in 1 2 3 4 5; do
+                if curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                  "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&attempt=$attempt" \
+                  --output "public-verify/$file" \
+                  && cmp -s "payload/$file" "public-verify/$file"; then
+                  verified=1
+                  break
+                fi
+                echo "Waiting for public propagation: $file (attempt $attempt/5)"
+                sleep 4
+              done
+              if [ "$verified" -ne 1 ]; then
+                echo "::error::Public verification mismatch after retries: $file"
+                sha256sum "payload/$file" "public-verify/$file" || true
+                exit 1
+              fi
             done
-            radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 'https://hrm.se/radar/summary.php?days=1')"
-            printf '%s' "$radar_summary" | grep -F '"schema": "HRM_RADAR_1.0"'
+
+            radar_ok=0
+            for attempt in 1 2 3 4 5; do
+              radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 "https://hrm.se/radar/summary.php?days=1&attempt=$attempt" || true)"
+              if printf '%s' "$radar_summary" | grep -Fq '"schema": "HRM_RADAR_1.0"'; then
+                radar_ok=1
+                break
+              fi
+              sleep 4
+            done
+            test "$radar_ok" = "1"
+
             radar_data_code="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' 'https://hrm.se/radar/data/.htaccess')"
             test "$radar_data_code" = "403"
             radar_collect_code="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' 'https://hrm.se/radar/collect.php')"
