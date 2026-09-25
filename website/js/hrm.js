@@ -198,4 +198,110 @@
   window.addEventListener("scroll", updateHeader, { passive: true });
   window.addEventListener("scroll", updateThreshold, { passive: true });
   reducedMotion.addEventListener?.("change", updateThreshold);
+
+  // HRM Radar 1.0 - first-party, privacy-first analytics.
+  const radar = (() => {
+    try {
+      const ls = window.localStorage;
+      const ss = window.sessionStorage;
+      const uuid = () => crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+      let anon = ls.getItem("hrm_radar_anon_v1");
+      if (!anon) { anon = uuid(); ls.setItem("hrm_radar_anon_v1", anon); }
+      let session = ss.getItem("hrm_radar_session_v1");
+      if (!session) { session = uuid(); ss.setItem("hrm_radar_session_v1", session); }
+
+      const day = new Date().toISOString().slice(0, 10);
+      const lastDay = ls.getItem("hrm_radar_last_day_v1");
+      let visitNo = Number(ls.getItem("hrm_radar_visit_no_v1") || "0");
+      if (lastDay !== day) {
+        visitNo += 1;
+        ls.setItem("hrm_radar_last_day_v1", day);
+        ls.setItem("hrm_radar_visit_no_v1", String(visitNo));
+      }
+      if (visitNo < 1) visitNo = 1;
+
+      const qp = new URLSearchParams(location.search);
+      let source = ss.getItem("hrm_radar_source_v1") || "";
+      let medium = ss.getItem("hrm_radar_medium_v1") || "";
+      let campaign = ss.getItem("hrm_radar_campaign_v1") || "";
+      let content = ss.getItem("hrm_radar_content_v1") || "";
+      let referrer = ss.getItem("hrm_radar_referrer_v1") || "";
+
+      if (!source) {
+        source = (qp.get("utm_source") || "").slice(0, 80);
+        medium = (qp.get("utm_medium") || "").slice(0, 80);
+        campaign = (qp.get("utm_campaign") || "").slice(0, 100);
+        content = (qp.get("utm_content") || "").slice(0, 100);
+        try {
+          const r = document.referrer ? new URL(document.referrer) : null;
+          if (r && r.hostname && r.hostname !== location.hostname) referrer = r.hostname;
+        } catch (_) {}
+        if (!source) source = referrer || "direct";
+        ss.setItem("hrm_radar_source_v1", source);
+        ss.setItem("hrm_radar_medium_v1", medium);
+        ss.setItem("hrm_radar_campaign_v1", campaign);
+        ss.setItem("hrm_radar_content_v1", content);
+        ss.setItem("hrm_radar_referrer_v1", referrer);
+      }
+
+      const sent = new Set();
+      const send = (event) => {
+        const onceKey = event + "|" + location.pathname;
+        if (sent.has(onceKey) && !["download", "contact_click", "discussion_click"].includes(event)) return;
+        sent.add(onceKey);
+        const payload = JSON.stringify({
+          event, anon, session, visit_no: visitNo,
+          path: location.pathname,
+          lang: document.documentElement.lang || "other",
+          source, medium, campaign, content, referrer
+        });
+        try {
+          const blob = new Blob([payload], { type: "application/json" });
+          if (navigator.sendBeacon && navigator.sendBeacon("/radar/collect.php", blob)) return;
+        } catch (_) {}
+        fetch("/radar/collect.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+          credentials: "same-origin"
+        }).catch(() => {});
+      };
+
+      send("page_view");
+
+      let active = 0;
+      const timer = setInterval(() => {
+        if (document.visibilityState === "visible") active += 1;
+        if (active === 30) send("engaged_30");
+        if (active === 120) { send("engaged_120"); clearInterval(timer); }
+      }, 1000);
+
+      let maxDepth = 0;
+      const depthCheck = () => {
+        const h = Math.max(document.documentElement.scrollHeight - innerHeight, 1);
+        maxDepth = Math.max(maxDepth, Math.min(1, scrollY / h));
+        if (maxDepth >= 0.5) send("scroll_50");
+        if (maxDepth >= 0.9) send("scroll_90");
+      };
+      addEventListener("scroll", depthCheck, { passive: true });
+      depthCheck();
+
+      document.addEventListener("click", (event) => {
+        const a = event.target instanceof Element ? event.target.closest("a[href]") : null;
+        if (!a) return;
+        const href = a.getAttribute("href") || "";
+        if (/^mailto:/i.test(href)) return send("contact_click");
+        if (/\.(pdf|docx?|txt|md|json|jsonl)(?:$|[?#])/i.test(href)) return send("download");
+        try {
+          const u = new URL(a.href, location.href);
+          if (u.hostname && u.hostname !== location.hostname) send("discussion_click");
+        } catch (_) {}
+      }, { capture: true });
+
+      return { send };
+    } catch (_) {
+      return { send: () => {} };
+    }
+  })();
 })();
