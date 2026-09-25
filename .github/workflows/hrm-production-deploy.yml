@@ -179,7 +179,7 @@ jobs:
             mkdir -p public-verify
             find payload -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r file; do
               case "$file" in
-                radar/collect.php|radar/summary.php|radar/data/.htaccess) continue ;;
+                .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
               esac
               mkdir -p "public-verify/$(dirname "$file")"
               curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
