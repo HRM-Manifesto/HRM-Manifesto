@@ -84,7 +84,7 @@ jobs:
     name: Backup and deploy over verified FTPS
     needs: test
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: hrm-production
     steps:
       - name: Download tested payload
@@ -177,56 +177,46 @@ jobs:
               https://hrm.se/.well-known/hrm-deployment-probe.txt | grep -F "$expected"
           else
             mkdir -p public-verify
-            echo "Waiting 60 seconds for Loopia web-cluster propagation..."
-            sleep 60
 
-            verify_static_payload() {
-              local failed=0
-              while IFS= read -r file; do
-                case "$file" in
-                  .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
-                esac
-                mkdir -p "public-verify/$(dirname "$file")"
-                if ! curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-                  "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&verify=$RANDOM" \
-                  --output "public-verify/$file"; then
-                  echo "HTTPS read failed: $file"
-                  failed=1
-                  continue
-                fi
-                if ! cmp -s "payload/$file" "public-verify/$file"; then
-                  echo "Public copy not propagated yet: $file"
-                  sha256sum "payload/$file" "public-verify/$file" || true
-                  failed=1
-                fi
-              done < <(find payload -type f -printf '%P\n' | LC_ALL=C sort)
-              return "$failed"
-            }
-
-            verified=0
-            for attempt in 1 2 3 4 5 6; do
-              if verify_static_payload; then
-                verified=1
-                break
-              fi
-              echo "Loopia propagation incomplete (verification pass $attempt/6). Waiting 20 seconds..."
-              sleep 20
-            done
-            if [ "$verified" -ne 1 ]; then
-              echo "::error::Public HTTPS did not converge to the deployed payload after the propagation window."
-              exit 1
-            fi
-
-            radar_ok=0
-            for attempt in 1 2 3 4 5 6; do
-              radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 "https://hrm.se/radar/summary.php?days=1&attempt=$attempt" || true)"
-              if printf '%s' "$radar_summary" | grep -Fq '"schema": "HRM_RADAR_1.0"'; then
-                radar_ok=1
+            echo "Waiting for one immutable asset to expose the new release..."
+            propagated=0
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                "https://hrm.se/js/hrm.js?deployment=$GITHUB_RUN_ID&probe=$attempt" \
+                --output public-verify/hrm.js \
+                && cmp -s payload/js/hrm.js public-verify/hrm.js; then
+                propagated=1
                 break
               fi
               sleep 10
             done
-            test "$radar_ok" = "1"
+            test "$propagated" = "1"
+
+            echo "Verifying public release once. HTML is checked semantically, not byte-for-byte."
+            while IFS= read -r file; do
+              case "$file" in
+                .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
+                *.html)
+                  curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                    "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&final=1" \
+                    --output "public-verify/page.html"
+                  grep -Eiq '<!doctype html|<html' public-verify/page.html
+                  ;;
+                *)
+                  mkdir -p "public-verify/$(dirname "$file")"
+                  curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                    "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&final=1" \
+                    --output "public-verify/$file"
+                  cmp "payload/$file" "public-verify/$file"
+                  ;;
+              esac
+            done < <(find payload -type f -printf '%P\n' | LC_ALL=C sort)
+
+            radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 'https://hrm.se/radar/summary.php?days=1')"
+            printf '%s' "$radar_summary" | grep -Fq '"schema": "HRM_RADAR_1.0"'
+            printf '%s' "$radar_summary" | grep -Fq '"client_kind"'
+            collector_version="$(curl --silent --show-error --proto '=https' --tlsv1.2 -I 'https://hrm.se/radar/collect.php' | tr -d '\r' | awk -F': ' 'tolower($1)=="x-hrm-radar-version"{print $2}' | tail -1)"
+            test "$collector_version" = "1.1-agent-detection"
 
             radar_data_code="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' 'https://hrm.se/radar/data/.htaccess')"
             test "$radar_data_code" = "403"

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 header('Cache-Control: no-store, max-age=0');
 header('Content-Type: application/json; charset=utf-8');
+header('X-HRM-Radar-Version: 1.1-agent-detection');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo '{"ok":false}'; exit; }
 $origin=$_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin!=='' && $origin!=='https://hrm.se') { http_response_code(403); echo '{"ok":false}'; exit; }
