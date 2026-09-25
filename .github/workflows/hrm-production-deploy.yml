@@ -177,38 +177,54 @@ jobs:
               https://hrm.se/.well-known/hrm-deployment-probe.txt | grep -F "$expected"
           else
             mkdir -p public-verify
-            find payload -type f -printf '%P\n' | LC_ALL=C sort | while IFS= read -r file; do
-              case "$file" in
-                .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
-              esac
-              mkdir -p "public-verify/$(dirname "$file")"
-              verified=0
-              for attempt in 1 2 3 4 5; do
-                if curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
-                  "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&attempt=$attempt" \
-                  --output "public-verify/$file" \
-                  && cmp -s "payload/$file" "public-verify/$file"; then
-                  verified=1
-                  break
+            echo "Waiting 60 seconds for Loopia web-cluster propagation..."
+            sleep 60
+
+            verify_static_payload() {
+              local failed=0
+              while IFS= read -r file; do
+                case "$file" in
+                  .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
+                esac
+                mkdir -p "public-verify/$(dirname "$file")"
+                if ! curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                  "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&verify=$RANDOM" \
+                  --output "public-verify/$file"; then
+                  echo "HTTPS read failed: $file"
+                  failed=1
+                  continue
                 fi
-                echo "Waiting for public propagation: $file (attempt $attempt/5)"
-                sleep 4
-              done
-              if [ "$verified" -ne 1 ]; then
-                echo "::error::Public verification mismatch after retries: $file"
-                sha256sum "payload/$file" "public-verify/$file" || true
-                exit 1
+                if ! cmp -s "payload/$file" "public-verify/$file"; then
+                  echo "Public copy not propagated yet: $file"
+                  sha256sum "payload/$file" "public-verify/$file" || true
+                  failed=1
+                fi
+              done < <(find payload -type f -printf '%P\n' | LC_ALL=C sort)
+              return "$failed"
+            }
+
+            verified=0
+            for attempt in 1 2 3 4 5 6; do
+              if verify_static_payload; then
+                verified=1
+                break
               fi
+              echo "Loopia propagation incomplete (verification pass $attempt/6). Waiting 20 seconds..."
+              sleep 20
             done
+            if [ "$verified" -ne 1 ]; then
+              echo "::error::Public HTTPS did not converge to the deployed payload after the propagation window."
+              exit 1
+            fi
 
             radar_ok=0
-            for attempt in 1 2 3 4 5; do
+            for attempt in 1 2 3 4 5 6; do
               radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 "https://hrm.se/radar/summary.php?days=1&attempt=$attempt" || true)"
               if printf '%s' "$radar_summary" | grep -Fq '"schema": "HRM_RADAR_1.0"'; then
                 radar_ok=1
                 break
               fi
-              sleep 4
+              sleep 10
             done
             test "$radar_ok" = "1"
 
