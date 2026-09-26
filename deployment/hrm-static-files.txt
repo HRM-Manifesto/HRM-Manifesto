@@ -71,3 +71,7 @@ HRM_BENCHMARK_SHA256SUMS.txt
 radar/collect.php
 radar/summary.php
 radar/data/.htaccess
+journal/signatures/creation-to-emancipation/INTEGRITY.json
+journal/signatures/creation-to-emancipation/INTEGRITY.json.minisig
+journal/signatures/creation-to-emancipation/HRM_FOUNDER.pub
+journal/signatures/creation-to-emancipation/VERIFY.txt

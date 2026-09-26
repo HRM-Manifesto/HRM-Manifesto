@@ -1,0 +1,20 @@
+HRM Journal — founder signature verification
+Essay: From Creation to Emancipation / Od stworzenia do emancypacji / Från skapelse till emancipation
+Author: Aleksander Krzymowski
+Date: 2026-09-26
+
+Files:
+  INTEGRITY.json
+  INTEGRITY.json.minisig
+  HRM_FOUNDER.pub
+
+Verify the founder signature with Minisign:
+
+  minisign -Vm INTEGRITY.json -p HRM_FOUNDER.pub
+
+Then compare the SHA-256 values in INTEGRITY.json with the three published HTML files:
+  /journal/from-creation-to-emancipation.html
+  /pl/journal/od-stworzenia-do-emancypacji.html
+  /sv/journal/fran-skapelse-till-emancipation.html
+
+A valid signature proves provenance and integrity of the signed manifest. It does not by itself prove the philosophical claims of the essay.

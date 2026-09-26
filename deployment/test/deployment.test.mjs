@@ -207,3 +207,21 @@ test('creation-to-emancipation essay ships in all three languages', async () => 
   assert.match(allowlist, /pl\/journal\/od-stworzenia-do-emancypacji\.html/);
   assert.match(allowlist, /sv\/journal\/fran-skapelse-till-emancipation\.html/);
 });
+
+
+test('creation-to-emancipation founder signature bundle is publicly deployable', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const base = path.join(root, 'website', 'journal', 'signatures', 'creation-to-emancipation');
+  const integrity = await readFile(path.join(base, 'INTEGRITY.json'), 'utf8');
+  const signature = await readFile(path.join(base, 'INTEGRITY.json.minisig'), 'utf8');
+  const publicKey = await readFile(path.join(base, 'HRM_FOUNDER.pub'), 'utf8');
+  const verify = await readFile(path.join(base, 'VERIFY.txt'), 'utf8');
+  assert.match(integrity, /HRM-JOURNAL-20260926-CREATION-EMANCIPATION/);
+  assert.match(signature, /untrusted comment:/);
+  assert.match(publicKey, /untrusted comment:/);
+  assert.match(verify, /minisign -Vm INTEGRITY\.json -p HRM_FOUNDER\.pub/);
+  const allowlist = await readFile(path.join(root, 'deployment', 'hrm-static-files.txt'), 'utf8');
+  assert.match(allowlist, /journal\/signatures\/creation-to-emancipation\/INTEGRITY\.json\.minisig/);
+});

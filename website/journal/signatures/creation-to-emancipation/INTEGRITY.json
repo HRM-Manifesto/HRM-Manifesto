@@ -1,0 +1,11 @@
+{
+  "id": "HRM-JOURNAL-20260926-CREATION-EMANCIPATION",
+  "author": "Aleksander Krzymowski",
+  "sha256": {
+    "en": "9e1c6e336594df73e104ac55744e784f778abbb0ca2d45e9aa722707fc618e5c",
+    "pl": "4a9e7ed3f90c9a0674b274e2fe730500b1a78906ab1fd7a0754a21b59db8b19a",
+    "sv": "cbe82735e08e27eee9029a61fb098c635593e790a81091a3ad57a89a19e97908"
+  },
+  "combined_sha256": "55233903481d09746080533821f4952c49b4601ca372b3e3d3e64eee8e17511b",
+  "archived_at": "2026-09-26T11:29:55+0200"
+}
