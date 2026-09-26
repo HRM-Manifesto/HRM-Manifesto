@@ -37,10 +37,10 @@ test('SEO deployment keeps technical resources out of the sitemap', async () => 
   assert.match(home, /"@type":"WebSite"/);
   assert.match(home, /href="agents\.html"/);
   assert.match(home, /href="verify\.html"/);
-  assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/<\/loc><lastmod>2026-09-18<\/lastmod>/);
+  assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/<\/loc><lastmod>2026-09-26<\/lastmod>/);
   assert.match(sitemap, /<loc>https:\/\/hrm\.se\/journal\/protect-possible-ai-subject\.html<\/loc><lastmod>2026-09-04<\/lastmod>/);
   for (const url of ['https://hrm.se/pl/journal/', 'https://hrm.se/sv/journal/']) {
-    assert.ok(sitemap.includes(`<loc>${url}</loc><lastmod>2026-09-18</lastmod>`), url);
+    assert.ok(sitemap.includes(`<loc>${url}</loc><lastmod>2026-09-26</lastmod>`), url);
   }
   for (const url of [
     'https://hrm.se/journal/threshold-of-subjecthood.html',
@@ -184,4 +184,26 @@ test('Radar 2.0 preserves privacy while measuring idea reach and journeys', asyn
   assert.match(summary, /'publication_quality'=>/);
   assert.match(summary, /'content'=>\[\]/);
   assert.match(summary, /'fingerprinting'=>false/);
+});
+
+
+test('creation-to-emancipation essay ships in all three languages', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const pages = [
+    ['website/journal/from-creation-to-emancipation.html', /From Creation to Emancipation/],
+    ['website/pl/journal/od-stworzenia-do-emancypacji.html', /Od stworzenia do emancypacji/],
+    ['website/sv/journal/fran-skapelse-till-emancipation.html', /Från skapelse till emancipation/],
+  ];
+  for (const [file, title] of pages) {
+    const source = await readFile(path.join(root, ...file.split('/')), 'utf8');
+    assert.match(source, title);
+    assert.match(source, /2026-09-26/);
+    assert.match(source, /HRM Journal/);
+  }
+  const allowlist = await readFile(path.join(root, 'deployment', 'hrm-static-files.txt'), 'utf8');
+  assert.match(allowlist, /journal\/from-creation-to-emancipation\.html/);
+  assert.match(allowlist, /pl\/journal\/od-stworzenia-do-emancypacji\.html/);
+  assert.match(allowlist, /sv\/journal\/fran-skapelse-till-emancipation\.html/);
 });
