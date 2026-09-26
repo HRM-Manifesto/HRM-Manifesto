@@ -132,7 +132,7 @@ test('HRM.se 2.0 foregrounds durable Core, AI Gateway and verification in all th
     assert.match(source, /href="verify\.html"/);
     assert.match(source, /href="agents\.html"/);
     assert.match(source, /hrm-visual3d\.css\?v=20260918-v4/);
-    assert.match(source, /hrm-v3\.css\?v=20260924-v1/);
+    assert.match(source, /hrm-v3\.css\?v=20260926-human1/);
   }
   for (const page of ['verify.html','pl/verify.html','sv/verify.html']) {
     const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
