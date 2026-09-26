@@ -214,7 +214,10 @@ test('creation-to-emancipation founder signature bundle is publicly deployable',
   const { default: path } = await import('node:path');
   const root = path.resolve(import.meta.dirname, '..', '..');
   const base = path.join(root, 'website', 'journal', 'signatures', 'creation-to-emancipation');
-  const integrity = await readFile(path.join(base, 'INTEGRITY.json'), 'utf8');
+  const integrityBytes = await readFile(path.join(base, 'INTEGRITY.json'));
+  const { createHash } = await import('node:crypto');
+  assert.equal(createHash('sha256').update(integrityBytes).digest('hex'), 'e02c2b0eb60659af5c154e17c2fa6b2ecb48a4710aaeeafa0c070255e0fb3801');
+  const integrity = integrityBytes.toString('utf8');
   const signature = await readFile(path.join(base, 'INTEGRITY.json.minisig'), 'utf8');
   const publicKey = await readFile(path.join(base, 'HRM_FOUNDER.pub'), 'utf8');
   const verify = await readFile(path.join(base, 'VERIFY.txt'), 'utf8');
