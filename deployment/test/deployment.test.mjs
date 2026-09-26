@@ -228,3 +228,15 @@ test('creation-to-emancipation founder signature bundle is publicly deployable',
   const allowlist = await readFile(path.join(root, 'deployment', 'hrm-static-files.txt'), 'utf8');
   assert.match(allowlist, /journal\/signatures\/creation-to-emancipation\/INTEGRITY\.json\.minisig/);
 });
+
+
+test('inner-page reveal never hides the full long-form document body', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const script = await readFile(path.join(root, 'website', 'js', 'hrm-inner3d.js'), 'utf8');
+  assert.doesNotMatch(script, /querySelectorAll\([^\n]*\.section-inner/);
+  assert.match(script, /querySelectorAll\("\.archive-entry, \.agent-caveat, \.contact-note"\)/);
+  const article = await readFile(path.join(root, 'website', 'journal', 'from-creation-to-emancipation.html'), 'utf8');
+  assert.match(article, /hrm-inner3d\.js\?v=20260926-v2/);
+});

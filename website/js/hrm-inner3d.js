@@ -21,7 +21,10 @@
     },{passive:true});
   }
 
-  const targets=document.querySelectorAll(".section-inner, .archive-entry, .agent-caveat, .contact-note");
+  // Never hide the main document body. Long prose sections can be taller than
+  // the viewport, making a percentage-based IntersectionObserver threshold
+  // impossible to satisfy and leaving the entire article permanently invisible.
+  const targets=document.querySelectorAll(".archive-entry, .agent-caveat, .contact-note");
   if(!reduced.matches && "IntersectionObserver" in window){
     const io=new IntersectionObserver((entries)=>{
       for(const entry of entries){
@@ -30,7 +33,7 @@
           io.unobserve(entry.target);
         }
       }
-    },{threshold:.08,rootMargin:"0px 0px -5% 0px"});
+    },{threshold:0,rootMargin:"0px 0px -5% 0px"});
     targets.forEach((el)=>{el.classList.add("inner-reveal");io.observe(el);});
   }
 })();
