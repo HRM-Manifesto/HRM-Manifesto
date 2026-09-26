@@ -215,8 +215,9 @@ jobs:
             radar_summary="$(curl --fail --silent --show-error --proto '=https' --tlsv1.2 'https://hrm.se/radar/summary.php?days=1')"
             printf '%s' "$radar_summary" | grep -Fq '"schema": "HRM_RADAR_1.0"'
             printf '%s' "$radar_summary" | grep -Fq '"client_kind"'
+            printf '%s' "$radar_summary" | grep -Fq '"radar_version": "2.0"'
             collector_version="$(curl --silent --show-error --proto '=https' --tlsv1.2 -I 'https://hrm.se/radar/collect.php' | tr -d '\r' | awk -F': ' 'tolower($1)=="x-hrm-radar-version"{print $2}' | tail -1)"
-            test "$collector_version" = "1.1-agent-detection"
+            test "$collector_version" = "2.0-idea-journeys"
 
             radar_data_code="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' 'https://hrm.se/radar/data/.htaccess')"
             test "$radar_data_code" = "403"

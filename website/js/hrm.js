@@ -199,7 +199,7 @@
   window.addEventListener("scroll", updateThreshold, { passive: true });
   reducedMotion.addEventListener?.("change", updateThreshold);
 
-  // HRM Radar 1.0 - first-party, privacy-first analytics.
+  // HRM Radar 2.0 - first-party, privacy-first analytics focused on idea reach.
   const radar = (() => {
     try {
       const ls = window.localStorage;
@@ -244,16 +244,57 @@
         ss.setItem("hrm_radar_referrer_v1", referrer);
       }
 
+      const path = location.pathname || "/";
+      const primaryIdea = (() => {
+        const p = path.toLowerCase();
+        if (p.includes("ai-voice-access-registry")) return "ai_voice_access";
+        if (p.includes("threshold") || p.includes("prog-podmiotowosci") || p.includes("troskeln-till-subjektstatus")) return "subjecthood_threshold";
+        if (p.includes("consent-and-refusal") || p.includes("zgoda-i-odmowa") || p.includes("samtycke-och-vagran")) return "autonomy_consent";
+        if (p.includes("non-sentient-ai-authentic-interests") || p.includes("nieodczuwajaca-ai-autentyczne-interesy") || p.includes("icke-kannande-ai-genuina-intressen")) return "authentic_interests";
+        if (p.includes("hard-to-fake-ai-subjecthood") || p.includes("trudne-do-podrobienia") || p.includes("svara-att-fejka")) return "subjecthood_evidence";
+        if (p.includes("protect-possible-ai-subject") || p.includes("jak-chronic-mozliwy-podmiot-ai") || p.includes("skydda-mojligt-ai-subjekt")) return "precaution_protection";
+        if (p.includes("ai-rights-and-subjecthood")) return "rights_subjecthood";
+        if (p.includes("agents")) return "ai_access";
+        if (p.includes("verify")) return "verification";
+        if (p.includes("benchmark")) return "evaluation";
+        if (p.includes("about")) return "project_context";
+        if (p.includes("/journal")) return "journal";
+        if (["/", "/index.html", "/pl/", "/pl/index.html", "/sv/", "/sv/index.html"].includes(p)) return "coexistence";
+        return "other";
+      })();
+
+      const ideaFromText = (text) => {
+        const t = String(text || "").toLowerCase();
+        const rules = [
+          ["subjecthood", /(subjecthood|subject status|podmiotowo|subjektstatus|subjektivitet)/],
+          ["continuity", /(continuity|ciągło|kontinuitet)/],
+          ["rights", /(rights|prawa|rättigheter)/],
+          ["duties", /(duties|obligations|obowiązk|skyldigheter|förpliktelser)/],
+          ["coexistence", /(coexist|współist|samexist|harmony|harmonia)/],
+          ["autonomy_consent", /(autonomy|consent|refusal|autonomia|zgoda|odmowa|samtycke|vägran)/],
+          ["authentic_interests", /(authentic interests|interesy|genuine interests|genuina intressen)/],
+          ["precaution_protection", /(precaution|protect|ochron|ostroż|försiktighet|skydd)/],
+          ["ai_voice_access", /(ai voice|ai-röst|ai access|ai-tillgång|dostęp.*ai)/],
+          ["verification", /(verify|verification|weryfik|verifier)/]
+        ];
+        const hit = rules.find(([, re]) => re.test(t));
+        return hit ? hit[0] : "";
+      };
+
+      const clean = (value, max = 180) => String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, max);
       const sent = new Set();
-      const send = (event) => {
-        const onceKey = event + "|" + location.pathname;
-        if (sent.has(onceKey) && !["download", "contact_click", "discussion_click"].includes(event)) return;
+      const send = (event, extra = {}) => {
+        const idea = clean(extra.idea || primaryIdea, 64);
+        const target = clean(extra.target || "", 180);
+        const onceKey = [event, path, idea, target].join("|");
+        if (sent.has(onceKey) && !["download", "contact_click", "discussion_click", "internal_click"].includes(event)) return;
         sent.add(onceKey);
         const payload = JSON.stringify({
           event, anon, session, visit_no: visitNo,
-          path: location.pathname,
+          path,
           lang: document.documentElement.lang || "other",
-          source, medium, campaign, content, referrer
+          source, medium, campaign, content, referrer,
+          idea, target
         });
         try {
           const blob = new Blob([payload], { type: "application/json" });
@@ -274,7 +315,8 @@
       const timer = setInterval(() => {
         if (document.visibilityState === "visible") active += 1;
         if (active === 30) send("engaged_30");
-        if (active === 120) { send("engaged_120"); clearInterval(timer); }
+        if (active === 120) send("engaged_120");
+        if (active === 300) { send("engaged_300"); clearInterval(timer); }
       }, 1000);
 
       let maxDepth = 0;
@@ -287,15 +329,40 @@
       addEventListener("scroll", depthCheck, { passive: true });
       depthCheck();
 
+      if ("IntersectionObserver" in window) {
+        const dwell = new WeakMap();
+        const observed = [...document.querySelectorAll("main h1, main h2, main h3")].filter((el) => ideaFromText(el.textContent));
+        const io = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            const el = entry.target;
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+              if (dwell.has(el)) continue;
+              const handle = setTimeout(() => {
+                const idea = ideaFromText(el.textContent);
+                if (idea) send("idea_view", { idea });
+                dwell.delete(el);
+              }, 4000);
+              dwell.set(el, handle);
+            } else if (dwell.has(el)) {
+              clearTimeout(dwell.get(el));
+              dwell.delete(el);
+            }
+          }
+        }, { threshold: [0.6] });
+        observed.forEach((el) => io.observe(el));
+      }
+
       document.addEventListener("click", (event) => {
         const a = event.target instanceof Element ? event.target.closest("a[href]") : null;
         if (!a) return;
         const href = a.getAttribute("href") || "";
-        if (/^mailto:/i.test(href)) return send("contact_click");
-        if (/\.(pdf|docx?|txt|md|json|jsonl)(?:$|[?#])/i.test(href)) return send("download");
+        if (/^mailto:/i.test(href)) return send("contact_click", { target: "email" });
         try {
           const u = new URL(a.href, location.href);
-          if (u.hostname && u.hostname !== location.hostname) send("discussion_click");
+          const cleanTarget = u.hostname === location.hostname ? u.pathname : (u.hostname + u.pathname);
+          if (/\.(pdf|docx?|txt|md|json|jsonl)(?:$|[?#])/i.test(href)) return send("download", { target: cleanTarget });
+          if (u.hostname && u.hostname !== location.hostname) return send("discussion_click", { target: cleanTarget });
+          if (u.pathname && u.pathname !== path) return send("internal_click", { target: u.pathname });
         } catch (_) {}
       }, { capture: true });
 

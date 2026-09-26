@@ -146,3 +146,28 @@ test('HRM.se 2.0 foregrounds durable Core, AI Gateway and verification in all th
     assert.match(source, /ai\/1\.0\.0\/units\.jsonl/);
   }
 });
+
+
+test('Radar 2.0 preserves privacy while measuring idea reach and journeys', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const client = await readFile(path.join(root, 'website', 'js', 'hrm.js'), 'utf8');
+  const collector = await readFile(path.join(root, 'website', 'radar', 'collect.php'), 'utf8');
+  const summary = await readFile(path.join(root, 'website', 'radar', 'summary.php'), 'utf8');
+
+  assert.match(client, /HRM Radar 2\.0/);
+  assert.match(client, /idea_view/);
+  assert.match(client, /engaged_300/);
+  assert.match(client, /internal_click/);
+  assert.match(collector, /2\.0-idea-journeys/);
+  assert.match(collector, /'idea'=>/);
+  assert.match(collector, /'target'=>/);
+  assert.doesNotMatch(collector, /'user_agent'=>|'ip'=>/);
+  assert.match(summary, /'radar_version'=>'2\.0'/);
+  assert.match(summary, /'source_quality'=>/);
+  assert.match(summary, /'agent_pages'=>/);
+  assert.match(summary, /'agent_ideas'=>/);
+  assert.match(summary, /'transitions'=>/);
+  assert.match(summary, /'fingerprinting'=>false/);
+});
