@@ -160,7 +160,10 @@ test('Radar 2.0 preserves privacy while measuring idea reach and journeys', asyn
   assert.match(client, /idea_view/);
   assert.match(client, /engaged_300/);
   assert.match(client, /internal_click/);
-  assert.match(collector, /2\.0-idea-journeys/);
+  assert.match(collector, /2\.1-referrer-page/);
+  assert.match(client, /referrer_page/);
+  assert.match(collector, /referrer_page/);
+  assert.match(summary, /referrer_pages/);
   assert.match(collector, /'idea'=>/);
   assert.match(collector, /'target'=>/);
   assert.doesNotMatch(collector, /'user_agent'=>|'ip'=>/);

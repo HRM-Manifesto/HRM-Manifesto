@@ -217,7 +217,7 @@ jobs:
             printf '%s' "$radar_summary" | grep -Fq '"client_kind"'
             printf '%s' "$radar_summary" | grep -Fq '"radar_version": "2.0"'
             collector_version="$(curl --silent --show-error --proto '=https' --tlsv1.2 -I 'https://hrm.se/radar/collect.php' | tr -d '\r' | awk -F': ' 'tolower($1)=="x-hrm-radar-version"{print $2}' | tail -1)"
-            test "$collector_version" = "2.0-idea-journeys"
+            test "$collector_version" = "2.1-referrer-page"
 
             radar_data_code="$(curl --silent --show-error --proto '=https' --tlsv1.2 -o /dev/null -w '%{http_code}' 'https://hrm.se/radar/data/.htaccess')"
             test "$radar_data_code" = "403"

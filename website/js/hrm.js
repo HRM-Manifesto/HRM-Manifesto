@@ -226,6 +226,7 @@
       let campaign = ss.getItem("hrm_radar_campaign_v1") || "";
       let content = ss.getItem("hrm_radar_content_v1") || "";
       let referrer = ss.getItem("hrm_radar_referrer_v1") || "";
+      let referrerPage = ss.getItem("hrm_radar_referrer_page_v1") || "";
 
       if (!source) {
         source = (qp.get("utm_source") || "").slice(0, 80);
@@ -234,7 +235,12 @@
         content = (qp.get("utm_content") || "").slice(0, 100);
         try {
           const r = document.referrer ? new URL(document.referrer) : null;
-          if (r && r.hostname && r.hostname !== location.hostname) referrer = r.hostname;
+          if (r && r.hostname && r.hostname !== location.hostname) {
+            referrer = r.hostname;
+            if (r.protocol === "https:" || r.protocol === "http:") {
+              referrerPage = (r.hostname + (r.pathname || "/")).slice(0, 300);
+            }
+          }
         } catch (_) {}
         if (!source) source = referrer || "direct";
         ss.setItem("hrm_radar_source_v1", source);
@@ -242,6 +248,7 @@
         ss.setItem("hrm_radar_campaign_v1", campaign);
         ss.setItem("hrm_radar_content_v1", content);
         ss.setItem("hrm_radar_referrer_v1", referrer);
+        ss.setItem("hrm_radar_referrer_page_v1", referrerPage);
       }
 
       const path = location.pathname || "/";
@@ -293,7 +300,7 @@
           event, anon, session, visit_no: visitNo,
           path,
           lang: document.documentElement.lang || "other",
-          source, medium, campaign, content, referrer,
+          source, medium, campaign, content, referrer, referrer_page: referrerPage,
           idea, target
         });
         try {

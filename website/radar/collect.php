@@ -2,7 +2,7 @@
 declare(strict_types=1);
 header('Cache-Control: no-store, max-age=0');
 header('Content-Type: application/json; charset=utf-8');
-header('X-HRM-Radar-Version: 2.0-idea-journeys');
+header('X-HRM-Radar-Version: 2.1-referrer-page');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo '{"ok":false}'; exit; }
 $origin=$_SERVER['HTTP_ORIGIN'] ?? '';
 if ($origin!=='' && $origin!=='https://hrm.se') { http_response_code(403); echo '{"ok":false}'; exit; }
@@ -15,6 +15,17 @@ $event=strtolower((string)($data['event'] ?? ''));
 if (!in_array($event,$allowed,true)) { http_response_code(400); echo '{"ok":false}'; exit; }
 function ct($v,int $m=160):string{$v=trim((string)$v);$v=preg_replace('/[\x00-\x1F\x7F]/u','',$v) ?? '';return mb_substr($v,0,$m,'UTF-8');}
 function cp($v):string{$p=ct($v,240);if($p===''||$p[0]!=='/')return '/';$z=parse_url($p);return ct($z['path'] ?? '/',240);}
+function cr($v):string{
+  $raw=ct($v,320);if($raw==='')return '';
+  $u=parse_url(str_contains($raw,'://')?$raw:'https://'.$raw);
+  if(!is_array($u))return '';
+  $h=strtolower((string)($u['host'] ?? ''));if($h==='')return '';
+  $allow=['instagram.com','facebook.com','reddit.com','lesswrong.com','alignmentforum.org','effectivealtruism.org','x.com','twitter.com','linkedin.com','bsky.app','threads.net'];
+  $ok=false;foreach($allow as $d){if($h===$d||str_ends_with($h,'.'.$d)){$ok=true;break;}}
+  if(!$ok)return '';
+  $p=(string)($u['path'] ?? '/');if($p===''||$p[0]!=='/')$p='/';
+  return ct($h.$p,300);
+}
 function classify_client(string $ua):array{
   $u=strtolower($ua);
   $known=[
@@ -43,7 +54,7 @@ $anon=ct($data['anon'] ?? '',100);$session=ct($data['session'] ?? '',100);
 if ($anon===''||$session==='') { http_response_code(400); echo '{"ok":false}'; exit; }
 $ref=ct($data['referrer'] ?? '',160);
 if($ref!==''){$h=parse_url(str_contains($ref,'://')?$ref:'https://'.$ref,PHP_URL_HOST);$ref=ct($h ?: '',120);}
-$item=['at'=>gmdate('c'),'event'=>$event,'visitor'=>hash('sha256','hrm-radar-v1|'.$anon),'session'=>hash('sha256','hrm-radar-session-v1|'.$session),'path'=>cp($data['path'] ?? '/'),'lang'=>in_array(($data['lang'] ?? ''),['pl','en','sv'],true)?$data['lang']:'other','source'=>ct($data['source'] ?? 'direct',80),'medium'=>ct($data['medium'] ?? '',80),'campaign'=>ct($data['campaign'] ?? '',100),'content'=>ct($data['content'] ?? '',100),'referrer'=>$ref,'visit_no'=>max(1,min(9999,(int)($data['visit_no'] ?? 1))),'client_kind'=>$clientKind,'agent_label'=>$agentLabel,'agent_confidence'=>$agentConfidence,'idea'=>preg_match('/^[a-z0-9_-]{1,64}$/',(string)($data['idea'] ?? ''))?(string)$data['idea']:'other','target'=>ct($data['target'] ?? '',180)];
+$item=['at'=>gmdate('c'),'event'=>$event,'visitor'=>hash('sha256','hrm-radar-v1|'.$anon),'session'=>hash('sha256','hrm-radar-session-v1|'.$session),'path'=>cp($data['path'] ?? '/'),'lang'=>in_array(($data['lang'] ?? ''),['pl','en','sv'],true)?$data['lang']:'other','source'=>ct($data['source'] ?? 'direct',80),'medium'=>ct($data['medium'] ?? '',80),'campaign'=>ct($data['campaign'] ?? '',100),'content'=>ct($data['content'] ?? '',100),'referrer'=>$ref,'referrer_page'=>cr($data['referrer_page'] ?? ''),'visit_no'=>max(1,min(9999,(int)($data['visit_no'] ?? 1))),'client_kind'=>$clientKind,'agent_label'=>$agentLabel,'agent_confidence'=>$agentConfidence,'idea'=>preg_match('/^[a-z0-9_-]{1,64}$/',(string)($data['idea'] ?? ''))?(string)$data['idea']:'other','target'=>ct($data['target'] ?? '',180)];
 $dir=__DIR__.DIRECTORY_SEPARATOR.'data';
 if(!is_dir($dir)&&!mkdir($dir,0750,true)&&!is_dir($dir)){http_response_code(500);echo '{"ok":false}';exit;}
 $file=$dir.DIRECTORY_SEPARATOR.'events-'.gmdate('Y-m-d').'.jsonl';

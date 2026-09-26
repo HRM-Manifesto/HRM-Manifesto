@@ -9,7 +9,7 @@ $dir=__DIR__.DIRECTORY_SEPARATOR.'data';
 
 $events=0;$visitors=[];$sessions=[];$visitorDays=[];$interested=[];$contacts=[];$downloads=0;$byDay=[];
 $clientVisitors=[];$agentVisitors=[];$visitorMeta=[];$sourceMeta=[];$pageVisitors=[];$pageInterested=[];$pageDeep=[];
-$ideaVisitors=[];$agentPages=[];$agentIdeas=[];$sessionPages=[];
+$ideaVisitors=[];$agentPages=[];$agentIdeas=[];$sessionPages=[];$referrerPageVisitors=[];
 $dims=['source'=>[],'language'=>[],'page'=>[],'event'=>[],'campaign'=>[],'client_kind'=>[],'agent_label'=>[],'idea'=>[],'target'=>[]];
 
 function inc(array &$a,string $k,int $n=1):void{if($k==='')$k='(brak)';$a[$k]=($a[$k]??0)+$n;}
@@ -31,6 +31,7 @@ if(is_dir($dir))foreach(glob($dir.DIRECTORY_SEPARATOR.'events-*.jsonl')?:[] as $
     $idea=(string)($x['idea']??'other');
     $target=(string)($x['target']??'');
     $source=(string)($x['source']??'direct');
+    $referrerPage=(string)($x['referrer_page']??'');
     $lang=(string)($x['lang']??'other');
     $kind=(string)($x['client_kind']??'legacy');
     $agent=(string)($x['agent_label']??'');
@@ -53,6 +54,7 @@ if(is_dir($dir))foreach(glob($dir.DIRECTORY_SEPARATOR.'events-*.jsonl')?:[] as $
     if($agent!=='')$agentVisitors[$agent][$v]=true;
     setadd($pageVisitors,$p,$v);
     setadd($ideaVisitors,$idea,$v);
+    if($referrerPage!=='')setadd($referrerPageVisitors,$referrerPage,$v);
     if($agent!==''){setadd($agentPages,$agent.'|'.$p,$v);setadd($agentIdeas,$agent.'|'.$idea,$v);}
 
     if($e==='page_view'){
@@ -116,10 +118,11 @@ foreach($sessionPages as $pages){
 
 $agentPageOut=[];foreach($agentPages as $key=>$set)$agentPageOut[$key]=count($set);
 $agentIdeaOut=[];foreach($agentIdeas as $key=>$set)$agentIdeaOut[$key]=count($set);
+$referrerPageOut=[];foreach($referrerPageVisitors as $key=>$set)$referrerPageOut[$key]=count($set);
 
 ksort($byDay);
 foreach($dims as &$q)arsort($q);unset($q);
-arsort($ideaVisitors);arsort($transitions);arsort($agentPageOut);arsort($agentIdeaOut);
+arsort($ideaVisitors);arsort($transitions);arsort($agentPageOut);arsort($agentIdeaOut);arsort($referrerPageOut);
 
 $out=[
   'ok'=>true,
@@ -152,7 +155,8 @@ $out=[
   'page_quality'=>$pageMeta,
   'transitions'=>$transitions,
   'agent_pages'=>$agentPageOut,
-  'agent_ideas'=>$agentIdeaOut
+  'agent_ideas'=>$agentIdeaOut,
+  'referrer_pages'=>$referrerPageOut
 ];
 
 echo json_encode($out,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
