@@ -102,6 +102,30 @@ jobs:
           test -n "$LOOPIA_FTPS_USERNAME"
           test -n "$LOOPIA_FTPS_PASSWORD"
 
+      - name: Inspect hosting log availability (read only)
+        if: inputs.mode == 'production'
+        env:
+          LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}
+          LOOPIA_FTPS_PASSWORD: ${{ secrets.LOOPIA_FTPS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hosting-observability
+          curl --fail --silent --show-error --ftp-ssl-reqd --list-only \
+            --user "$LOOPIA_FTPS_USERNAME:$LOOPIA_FTPS_PASSWORD" \
+            ftp://ftpcluster.loopia.se/ > hosting-observability/root-listing.txt
+          grep -Ei '(^|/)(log|logs|statistics|stats|awstats)(/|$)|access|visitor' \
+            hosting-observability/root-listing.txt > hosting-observability/log-candidates.txt || true
+
+      - name: Save hosting observability probe
+        if: inputs.mode == 'production'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hrm-hosting-observability-${{ github.run_id }}
+          path: hosting-observability/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Back up exact production targets
         env:
           LOOPIA_FTPS_USERNAME: ${{ secrets.LOOPIA_FTPS_USERNAME }}

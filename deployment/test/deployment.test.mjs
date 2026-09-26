@@ -148,6 +148,15 @@ test('HRM.se 2.0 foregrounds durable Core, AI Gateway and verification in all th
 });
 
 
+test('production deploy probes hosting log availability without changing hosting configuration', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const workflow = await readFile(path.resolve(import.meta.dirname, '..', '..', '.github', 'workflows', 'hrm-production-deploy.yml'), 'utf8');
+  assert.match(workflow, /Inspect hosting log availability \(read only\)/);
+  assert.match(workflow, /hrm-hosting-observability-/);
+  assert.match(workflow, /--list-only/);
+});
+
 test('Radar 2.0 preserves privacy while measuring idea reach and journeys', async () => {
   const { readFile } = await import('node:fs/promises');
   const { default: path } = await import('node:path');
