@@ -10,7 +10,8 @@ $dir=__DIR__.DIRECTORY_SEPARATOR.'data';
 $events=0;$visitors=[];$sessions=[];$visitorDays=[];$interested=[];$contacts=[];$downloads=0;$byDay=[];
 $clientVisitors=[];$agentVisitors=[];$visitorMeta=[];$sourceMeta=[];$pageVisitors=[];$pageInterested=[];$pageDeep=[];
 $ideaVisitors=[];$agentPages=[];$agentIdeas=[];$sessionPages=[];$referrerPageVisitors=[];
-$dims=['source'=>[],'language'=>[],'page'=>[],'event'=>[],'campaign'=>[],'client_kind'=>[],'agent_label'=>[],'idea'=>[],'target'=>[]];
+$contentVisitors=[];$contentInterested=[];$contentDeep=[];$contentContacts=[];$contentOutbound=[];
+$dims=['source'=>[],'language'=>[],'page'=>[],'event'=>[],'campaign'=>[],'content'=>[],'client_kind'=>[],'agent_label'=>[],'idea'=>[],'target'=>[]];
 
 function inc(array &$a,string $k,int $n=1):void{if($k==='')$k='(brak)';$a[$k]=($a[$k]??0)+$n;}
 function setadd(array &$root,string $key,string $value):void{if($key===''||$value==='')return;$root[$key][$value]=true;}
@@ -31,6 +32,7 @@ if(is_dir($dir))foreach(glob($dir.DIRECTORY_SEPARATOR.'events-*.jsonl')?:[] as $
     $idea=(string)($x['idea']??'other');
     $target=(string)($x['target']??'');
     $source=(string)($x['source']??'direct');
+    $contentTag=(string)($x['content']??'');
     $referrerPage=(string)($x['referrer_page']??'');
     $lang=(string)($x['lang']??'other');
     $kind=(string)($x['client_kind']??'legacy');
@@ -41,9 +43,10 @@ if(is_dir($dir))foreach(glob($dir.DIRECTORY_SEPARATOR.'events-*.jsonl')?:[] as $
     $byDay[$date]['events']++;$byDay[$date]['sessions'][$s]=true;$byDay[$date]['visitors'][$v]=true;
     if($e==='page_view')$byDay[$date]['page_views']++;
 
-    if(interesting($e,$p)){$interested[$v]=true;$byDay[$date]['interested'][$v]=true;setadd($pageInterested,$p,$v);}
-    if(deep_event($e))setadd($pageDeep,$p,$v);
-    if($e==='contact_click'){$contacts[$v]=true;$byDay[$date]['contacts'][$v]=true;}
+    if(interesting($e,$p)){$interested[$v]=true;$byDay[$date]['interested'][$v]=true;setadd($pageInterested,$p,$v);if($contentTag!=='')setadd($contentInterested,$contentTag,$v);}
+    if(deep_event($e)){setadd($pageDeep,$p,$v);if($contentTag!=='')setadd($contentDeep,$contentTag,$v);}
+    if($e==='contact_click'){$contacts[$v]=true;$byDay[$date]['contacts'][$v]=true;if($contentTag!=='')setadd($contentContacts,$contentTag,$v);}
+    if($e==='discussion_click'&&$contentTag!=='')setadd($contentOutbound,$contentTag,$v);
     if($e==='download'){$downloads++;$byDay[$date]['downloads']++;}
 
     inc($dims['event'],$e);
@@ -54,12 +57,14 @@ if(is_dir($dir))foreach(glob($dir.DIRECTORY_SEPARATOR.'events-*.jsonl')?:[] as $
     if($agent!=='')$agentVisitors[$agent][$v]=true;
     setadd($pageVisitors,$p,$v);
     setadd($ideaVisitors,$idea,$v);
+    if($contentTag!=='')setadd($contentVisitors,$contentTag,$v);
     if($referrerPage!=='')setadd($referrerPageVisitors,$referrerPage,$v);
     if($agent!==''){setadd($agentPages,$agent.'|'.$p,$v);setadd($agentIdeas,$agent.'|'.$idea,$v);}
 
     if($e==='page_view'){
       inc($dims['source'],$source);inc($dims['language'],$lang);inc($dims['page'],$p);
       $c=(string)($x['campaign']??'');if($c!=='')inc($dims['campaign'],$c);
+      if($contentTag!=='')inc($dims['content'],$contentTag);
       $sessionPages[$s][]=$p;
     }
 
@@ -108,6 +113,15 @@ foreach($pageVisitors as $page=>$set)$pageMeta[$page]=[
   'interested'=>count($pageInterested[$page]??[]),
   'deep_read'=>count($pageDeep[$page]??[])
 ];
+$publicationMeta=[];
+foreach($contentVisitors as $tag=>$set){
+  $ret=0;foreach($set as $v=>$_)if(isset($returning[$v]))$ret++;
+  $publicationMeta[$tag]=[
+    'visitors'=>count($set),'interested'=>count($contentInterested[$tag]??[]),
+    'deep_read'=>count($contentDeep[$tag]??[]),'returning'=>$ret,
+    'contacts'=>count($contentContacts[$tag]??[]),'outbound'=>count($contentOutbound[$tag]??[])
+  ];
+}
 
 $transitions=[];
 foreach($sessionPages as $pages){
@@ -153,6 +167,7 @@ $out=[
   'ideas'=>$ideaVisitors,
   'source_quality'=>$sourceMeta,
   'page_quality'=>$pageMeta,
+  'publication_quality'=>$publicationMeta,
   'transitions'=>$transitions,
   'agent_pages'=>$agentPageOut,
   'agent_ideas'=>$agentIdeaOut,

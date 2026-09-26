@@ -172,5 +172,7 @@ test('Radar 2.0 preserves privacy while measuring idea reach and journeys', asyn
   assert.match(summary, /'agent_pages'=>/);
   assert.match(summary, /'agent_ideas'=>/);
   assert.match(summary, /'transitions'=>/);
+  assert.match(summary, /'publication_quality'=>/);
+  assert.match(summary, /'content'=>\[\]/);
   assert.match(summary, /'fingerprinting'=>false/);
 });
