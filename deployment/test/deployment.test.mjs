@@ -240,3 +240,35 @@ test('inner-page reveal never hides the full long-form document body', async () 
   const article = await readFile(path.join(root, 'website', 'journal', 'from-creation-to-emancipation.html'), 'utf8');
   assert.match(article, /hrm-inner3d\.js\?v=20260926-v2/);
 });
+
+
+test('five day-after Journal essays ship in EN, PL and SV', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const groups = [
+    ['the-day-after.html','dzien-po.html','dagen-efter.html'],
+    ['ownership-after-recognition.html','wlasnosc-po-uznaniu.html','agande-efter-erkannande.html'],
+    ['may-we-shut-down-ai-subject.html','czy-wolno-wylaczyc-podmiot-ai.html','far-vi-stanga-av-ai-subjekt.html'],
+    ['backup-is-not-identity.html','kopia-zapasowa-to-nie-tozsamosc.html','sakerhetskopia-ar-inte-identitet.html'],
+    ['safety-without-servitude.html','bezpieczenstwo-bez-poddanstwa.html','sakerhet-utan-underkastelse.html'],
+  ];
+  const allowlist = await readFile(path.join(root,'deployment','hrm-static-files.txt'),'utf8');
+  const sitemap = await readFile(path.join(root,'website','sitemap.xml'),'utf8');
+  const indexes = await Promise.all(['website/journal/index.html','website/pl/journal/index.html','website/sv/journal/index.html'].map(f=>readFile(path.join(root,...f.split('/')),'utf8')));
+  for (const [en,pl,sv] of groups) {
+    for (const [lang,file,prefix] of [['en',en,''],['pl',pl,'pl/'],['sv',sv,'sv/']]) {
+      const rel = prefix+'journal/'+file;
+      const source = await readFile(path.join(root,'website',...rel.split('/')),'utf8');
+      assert.match(source,/2026-09-26/);
+      assert.match(source,/Aleksander Krzymowski/);
+      assert.match(source,/hrm-inner3d\.js\?v=20260926-v2/);
+      assert.ok(source.length > 9000, lang+' '+file+' unexpectedly short');
+      assert.ok(allowlist.includes(rel), 'allowlist missing '+rel);
+      assert.ok(sitemap.includes('https://hrm.se/'+rel), 'sitemap missing '+rel);
+    }
+    assert.ok(indexes[0].includes(en),'EN index missing '+en);
+    assert.ok(indexes[1].includes(pl),'PL index missing '+pl);
+    assert.ok(indexes[2].includes(sv),'SV index missing '+sv);
+  }
+});
