@@ -90,3 +90,5 @@ sv/journal/sakerhetskopia-ar-inte-identitet.html
 journal/safety-without-servitude.html
 pl/journal/bezpieczenstwo-bez-poddanstwa.html
 sv/journal/sakerhet-utan-underkastelse.html
+images/aleksander-krzymowski.jpg
+images/aleksander-krzymowski-press.jpg

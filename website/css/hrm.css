@@ -1260,3 +1260,55 @@ body:not(.home-v2) .site-header { box-shadow: 0 1px 0 var(--line); }
   .question-list strong { display: block; min-width: 0; margin-bottom: .25rem; }
   .claim-grid article, .layer-grid article { min-height: 0; }
 }
+
+/* 2026-09-27 founder profile */
+.founder-profile {
+  display: grid;
+  grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+  gap: clamp(2.2rem, 5vw, 5rem);
+  align-items: start;
+  margin: clamp(4.5rem, 8vw, 7rem) 0 2rem;
+  padding-top: clamp(2.5rem, 5vw, 4.5rem);
+  border-top: 1px solid var(--line);
+}
+.founder-portrait img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.founder-details h2 {
+  margin: 0 0 .65rem;
+  font-size: clamp(2.2rem, 4.4vw, 4.1rem);
+}
+.founder-role {
+  margin-bottom: 1.6rem;
+  color: var(--metal);
+  font-weight: 700;
+}
+.founder-facts {
+  display: grid;
+  gap: .55rem;
+  margin: 1.9rem 0;
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: .86rem;
+}
+.founder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: 1.4rem;
+}
+@media (max-width: 700px) {
+  .founder-profile {
+    grid-template-columns: 1fr;
+  }
+  .founder-portrait {
+    max-width: 23rem;
+  }
+}
