@@ -224,7 +224,7 @@ jobs:
                   curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
                     "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&final=1" \
                     --output "public-verify/page.html"
-                  grep -Eiq '<!doctype html|<html' public-verify/page.html
+                  node deployment/verify-html-identity.mjs "payload/$file" "public-verify/page.html" "$file"
                   ;;
                 *)
                   mkdir -p "public-verify/$(dirname "$file")"

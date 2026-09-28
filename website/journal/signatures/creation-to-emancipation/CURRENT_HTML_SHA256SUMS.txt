@@ -1,0 +1,3 @@
+b8bc425680ff03bdd4efc5595a415e86b98c625991faf5e08aa08a76b307e310  journal/from-creation-to-emancipation.html
+d39a7912d72d026618230ae7ecf9eadd986972c5079a2445c286dbde2ddd6288  pl/journal/od-stworzenia-do-emancypacji.html
+68ca323aaf7409bb62fc4d59d305a83b38707dce887fdba81a5687866d1bec78  sv/journal/fran-skapelse-till-emancipation.html

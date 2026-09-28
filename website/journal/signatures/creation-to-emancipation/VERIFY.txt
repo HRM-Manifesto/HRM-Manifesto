@@ -1,20 +1,27 @@
-HRM Journal — founder signature verification
+HRM Journal - founder signature and current HTML verification
 Essay: From Creation to Emancipation / Od stworzenia do emancypacji / Från skapelse till emancipation
 Author: Aleksander Krzymowski
-Date: 2026-09-26
+Original signed package date: 2026-09-26
 
-Files:
-  INTEGRITY.json
-  INTEGRITY.json.minisig
-  HRM_FOUNDER.pub
+1. Verify the immutable founder-signed manifest:
+   minisign -Vm INTEGRITY.json -p HRM_FOUNDER.pub
 
-Verify the founder signature with Minisign:
+2. Meaning of that signature:
+   INTEGRITY.json authenticates the essay package as it existed when it was signed.
+   Do NOT expect its HTML hashes to equal later site-wrapper bytes after non-content changes
+   such as a JavaScript asset version parameter.
 
-  minisign -Vm INTEGRITY.json -p HRM_FOUNDER.pub
+3. Verify the current local/public HTML wrapper bytes against:
+   CURRENT_HTML_SHA256SUMS.txt
+   CURRENT_INTEGRITY.json
 
-Then compare the SHA-256 values in INTEGRITY.json with the three published HTML files:
+Current HTML files:
   /journal/from-creation-to-emancipation.html
   /pl/journal/od-stworzenia-do-emancypacji.html
   /sv/journal/fran-skapelse-till-emancipation.html
 
-A valid signature proves provenance and integrity of the signed manifest. It does not by itself prove the philosophical claims of the essay.
+The CURRENT_* files are a current-state checksum record, not a founder signature.
+The signed historical manifest is intentionally preserved unchanged.
+
+A valid signature proves provenance and integrity of the signed manifest. It does not prove
+the philosophical claims of the essay.

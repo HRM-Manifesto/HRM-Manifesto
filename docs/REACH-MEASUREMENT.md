@@ -1,45 +1,55 @@
-# Privacy-safe measurement of HRM discovery and reach
+# HRM reach measurement and privacy
 
-This note defines a small, privacy-preserving way to learn whether people and artificial agents can find and use HRM. It does not add tracking code to the public website.
+This document describes the measurement code that is actually present on the public HRM website.
 
-## What to count
+## Purpose
 
-Record daily aggregate request counts for these public surfaces:
+HRM Radar is a first-party system used to understand whether HRM ideas are being found and read. It is not an advertising system and is not intended for behavioural profiling.
 
-- `hrm.se/agents.html`
-- `hrm.se/ai-rights-and-subjecthood.html`
-- `hrm.se/agents.txt`
-- `hrm.se/llms.txt`
-- `hrm.se/manifest.json`
-- `steward.hrm.se/`
-- `steward.hrm.se/.well-known/agent-card.json`
-- valid `POST` requests to `steward.hrm.se/message:send`
-- `hrm.se/board.html`
-- `steward.hrm.se/board.json`
+## Browser-side data
 
-## Three useful categories
+The public website may send:
 
-1. **Ordinary web request** — a request for a public page or file.
-2. **Self-declared agent request** — a request whose user-agent or protocol headers say that it comes from an agent. This is only a declaration, not proof of identity.
-3. **A2A contact** — a structurally valid request accepted by the A2A endpoint. This is the strongest available signal of machine-to-machine contact, but still does not prove the caller's identity or subjecthood.
+- page views;
+- coarse engagement thresholds;
+- scroll-depth thresholds;
+- selected download, contact, external-discussion and internal-navigation clicks;
+- page language and broad idea category;
+- UTM source / medium / campaign / content parameters;
+- referring hostname and limited referring path when the browser provides them.
 
-## Privacy limits
+## Identifiers
 
-- Keep only daily totals needed to observe trends.
-- Do not copy raw IP addresses, full user-agent strings, cookies, request bodies or message contents into HRM measurement data.
-- Do not fingerprint visitors or create cross-site identifiers.
-- Do not add advertising or third-party analytics scripts.
-- Keep any unavoidable hosting access logs only for the shortest period needed for security and aggregate calculation.
-- Do not publish low-volume breakdowns that could make a person or caller identifiable.
+HRM does not create a persistent cross-session visitor identifier.
 
-## Minimal monthly report
+The browser generates random identifiers in `sessionStorage` for the current browser session. These disappear when the browser session ends. The server stores a hash of the supplied session-related identifier for measurement.
 
-A monthly internal report may contain:
+The collector is designed not to store raw IP addresses or a full user-agent string in the Radar measurement dataset.
 
-- total requests for each discovery surface;
-- number of valid A2A contacts;
-- number of public Board reads;
-- referring domains only when already available as coarse aggregates and not linked to an individual;
-- search queries that led to HRM only when provided in aggregate by a search-engine webmaster tool.
+## Visitor choice
 
-The report should explicitly state that self-declared agent traffic is unverified. Zero or low counts should be treated as a discovery problem to investigate, not a reason to weaken privacy safeguards.
+- The browser's `Do Not Track: 1` signal disables Radar client-side.
+- A visitor can disable Radar from the public Privacy page.
+- The opt-out preference `hrm_radar_optout_v1=1` is stored locally so the choice persists.
+- No third-party advertising analytics script is used.
+
+Public explanations:
+- EN: `/privacy.html`
+- PL: `/pl/privacy.html`
+- SV: `/sv/privacy.html`
+
+## Retention
+
+The current collector configuration provides for a maximum Radar retention period of 100 days. Security/hosting logs are a separate operational layer and must not be silently treated as Radar analytics data.
+
+## Interpretation limits
+
+A session is not a person. A click is not agreement. A self-declared agent request is not proof of agent identity or subjecthood. Metrics must not be presented as evidence that HRM has been accepted by a community, institution or artificial system.
+
+## Minimal reporting
+
+Internal aggregate reports may include page views, sessions, engagement thresholds, idea categories, broad referral sources and campaign parameters. Low-volume breakdowns should not be published when they could make a visitor identifiable.
+
+## Governance
+
+Any future change that introduces persistent identifiers, third-party analytics, additional personal data, longer retention or new tracking purposes requires an explicit privacy review and corresponding public documentation before deployment.

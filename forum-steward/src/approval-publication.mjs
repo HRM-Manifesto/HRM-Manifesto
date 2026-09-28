@@ -13,6 +13,9 @@ export async function executeApprovedReply({
   findMarkerImpl = findApprovalMarker,
   publishImpl = publishDiscussionReply,
 }) {
+  if (environment.GITHUB_ACTIONS === "true" && environment.HRM_FINAL_PAYLOAD_APPROVED !== "true") {
+    throw new Error("LEGACY_GITHUB_PUBLISH_DISABLED: final target-language payload must be approved before publication");
+  }
   const repository = String(environment.GITHUB_REPOSITORY ?? "");
   const approved = String(approvedPolishReply ?? "");
   if (!approved.trim() || approved.includes(record.approvalId)) throw new Error("Invalid approved Polish reply");

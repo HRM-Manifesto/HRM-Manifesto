@@ -199,26 +199,40 @@
   window.addEventListener("scroll", updateThreshold, { passive: true });
   reducedMotion.addEventListener?.("change", updateThreshold);
 
+  const privacyHref = document.documentElement.lang === "pl" ? "/pl/privacy.html" :
+    (document.documentElement.lang === "sv" ? "/sv/privacy.html" : "/privacy.html");
+  const privacyLabel = document.documentElement.lang === "pl" ? "Prywatność" :
+    (document.documentElement.lang === "sv" ? "Integritet" : "Privacy");
+  const footer = document.querySelector(".site-footer");
+  if (footer && !footer.querySelector("[data-hrm-privacy-link]")) {
+    const a = document.createElement("a");
+    a.href = privacyHref;
+    a.textContent = privacyLabel;
+    a.setAttribute("data-hrm-privacy-link", "1");
+    a.style.marginInlineStart = "1rem";
+    footer.append(a);
+  }
+
   // HRM Radar 2.0 - first-party, privacy-first analytics focused on idea reach.
   const radar = (() => {
     try {
       const ls = window.localStorage;
       const ss = window.sessionStorage;
+      const privacyPage = /(?:^|\/)privacy\.html$/i.test(location.pathname || "");
+      const optedOut = privacyPage || ls.getItem("hrm_radar_optout_v1") === "1" || navigator.doNotTrack === "1";
+      window.HRMRadarPrivacy = {
+        optOut() { ls.setItem("hrm_radar_optout_v1", "1"); },
+        optIn() { ls.removeItem("hrm_radar_optout_v1"); },
+        isOptedOut() { return ls.getItem("hrm_radar_optout_v1") === "1" || navigator.doNotTrack === "1"; }
+      };
+      if (optedOut) return { send: () => {} };
+
       const uuid = () => crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
-      let anon = ls.getItem("hrm_radar_anon_v1");
-      if (!anon) { anon = uuid(); ls.setItem("hrm_radar_anon_v1", anon); }
+      let anon = ss.getItem("hrm_radar_anon_session_v1");
+      if (!anon) { anon = uuid(); ss.setItem("hrm_radar_anon_session_v1", anon); }
       let session = ss.getItem("hrm_radar_session_v1");
       if (!session) { session = uuid(); ss.setItem("hrm_radar_session_v1", session); }
-
-      const day = new Date().toISOString().slice(0, 10);
-      const lastDay = ls.getItem("hrm_radar_last_day_v1");
-      let visitNo = Number(ls.getItem("hrm_radar_visit_no_v1") || "0");
-      if (lastDay !== day) {
-        visitNo += 1;
-        ls.setItem("hrm_radar_last_day_v1", day);
-        ls.setItem("hrm_radar_visit_no_v1", String(visitNo));
-      }
-      if (visitNo < 1) visitNo = 1;
+      const visitNo = 1;
 
       const qp = new URLSearchParams(location.search);
       let source = ss.getItem("hrm_radar_source_v1") || "";

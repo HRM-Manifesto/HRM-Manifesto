@@ -25,6 +25,9 @@ export async function runPublishApprovedReply({
   translateImpl = translateApprovedReply,
   publishImpl = publishDiscussionReply,
 }) {
+  if (environment.GITHUB_ACTIONS === "true" && environment.HRM_FINAL_PAYLOAD_APPROVED !== "true") {
+    throw new Error("LEGACY_GITHUB_PUBLISH_DISABLED: final target-language payload must be approved before publication");
+  }
   if (inputs.confirmation !== "PUBLISH") {
     return {
       published: false,

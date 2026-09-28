@@ -18,7 +18,7 @@ on:
 
 permissions:
   contents: read
-  discussions: write
+  discussions: read
 
 concurrency:
   group: hrm-publish-approved-reply-${{ github.run_id }}
@@ -35,6 +35,7 @@ jobs:
 
       - name: Validate approval, translate if needed, and publish
         env:
+          HRM_FINAL_PAYLOAD_APPROVED: "false"
           GITHUB_TOKEN: ${{ github.token }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.4-nano' }}

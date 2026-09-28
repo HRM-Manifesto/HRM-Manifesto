@@ -448,11 +448,15 @@ test("automatic and publishing workflows have isolated triggers and permissions"
   assert.doesNotMatch(automatic, /discussions: write/);
   assert.match(publishing, /on:\s*\n\s+workflow_dispatch:/);
   assert.doesNotMatch(publishing, /discussion(?:_comment)?:\s*\n/);
-  assert.match(publishing, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: write/);
+  assert.match(publishing, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: read/);
+  assert.doesNotMatch(publishing, /discussions: write/);
+  assert.match(publishing, /HRM_FINAL_PAYLOAD_APPROVED: "false"/);
   assert.doesNotMatch(publishing, /(?:contents|issues|pull-requests): write/);
   assert.match(emailApproval, /workflow_dispatch:\s*\n\s+schedule:/);
   assert.match(emailApproval, /cron: '\*\/5 \* \* \* \*'/);
-  assert.match(emailApproval, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: write/);
+  assert.match(emailApproval, /permissions:\s*\n\s+contents: read\s*\n\s+discussions: read/);
+  assert.doesNotMatch(emailApproval, /discussions: write/);
+  assert.match(emailApproval, /HRM_FINAL_PAYLOAD_APPROVED: "false"/);
   assert.doesNotMatch(emailApproval, /(?:contents|issues|pull-requests|actions): write/);
   assert.doesNotMatch(emailApproval, /discussion(?:_comment)?:\s*\n/);
 });
