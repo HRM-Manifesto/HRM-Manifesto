@@ -92,3 +92,14 @@ pl/journal/bezpieczenstwo-bez-poddanstwa.html
 sv/journal/sakerhet-utan-underkastelse.html
 images/aleksander-krzymowski.jpg
 images/aleksander-krzymowski-press.jpg
+privacy.html
+pl/privacy.html
+sv/privacy.html
+interpretive-note.html
+pl/interpretive-note.html
+sv/interpretive-note.html
+journal/editorial-method.html
+pl/journal/metoda-redakcyjna.html
+sv/journal/redaktionell-metod.html
+journal/signatures/creation-to-emancipation/CURRENT_HTML_SHA256SUMS.txt
+journal/signatures/creation-to-emancipation/CURRENT_INTEGRITY.json
