@@ -134,6 +134,8 @@ test('HRM.se 2.0 foregrounds the purpose of HRM, durable Core, AI Gateway and ve
     assert.match(source, /responsibility-gateway/);
     assert.match(source, /decalogue-preview/);
     assert.match(source, /href="decalogue\.html"/);
+    assert.match(source, /href="core\.html"/);
+    assert.doesNotMatch(source, /future-section day-after/);
     assert.match(source, /hrm-visual3d\.css\?v=20260918-v4/);
     assert.match(source, /hrm-v3\.css\?v=20260926-human1/);
   }
@@ -141,6 +143,7 @@ test('HRM.se 2.0 foregrounds the purpose of HRM, durable Core, AI Gateway and ve
     const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
     assert.match(source, /manifesto-orientation/);
     assert.match(source, /decalogue-preview/);
+    assert.match(source, /origin-note/);
     assert.match(source, /href="decalogue\.html"/);
     assert.match(source, /href="manifesto\.html"/);
   }
