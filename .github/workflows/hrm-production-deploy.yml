@@ -224,7 +224,7 @@ jobs:
               case "$file" in
                 .htaccess|*/.htaccess|radar/collect.php|radar/summary.php) continue ;;
                 *.html)
-                  curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+                  curl --location --fail --silent --show-error --proto '=https' --tlsv1.2 \
                     "https://hrm.se/$file?deployment=$GITHUB_RUN_ID&final=1" \
                     --output "public-verify/page.html"
                   node deployment/verify-html-identity.mjs "payload/$file" "public-verify/page.html" "$file"

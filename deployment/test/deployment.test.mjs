@@ -158,6 +158,7 @@ test('production deploy probes hosting log availability without changing hosting
   const deployJob = workflow.split(/\r?\n  deploy:\r?\n/)[1] || '';
   assert.match(deployJob, /Check out verification scripts/);
   assert.match(deployJob, /deployment\/verify-html-identity\.mjs/);
+  assert.match(deployJob, /curl --location --fail --silent --show-error --proto '=https'/);
 });
 
 test('Radar 2.0 preserves privacy while measuring idea reach and journeys', async () => {
