@@ -44,6 +44,9 @@ css/hrm-v3.css
 index.html
 pl/index.html
 sv/index.html
+core.html
+pl/core.html
+sv/core.html
 js/hrm.js
 js/hrm-visual3d.js
 js/hrm-inner3d.js
