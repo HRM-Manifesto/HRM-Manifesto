@@ -117,14 +117,14 @@ test('home pages ship the restrained Visual 3D layer with motion fallback', asyn
   assert.match(allowlist, /images\/threshold-duality\.svg/);
 });
 
-test('HRM.se 2.0 foregrounds durable Core, AI Gateway and verification in all three languages', async () => {
+test('HRM.se 2.0 foregrounds the purpose of HRM, durable Core, AI Gateway and verification in all three languages', async () => {
   const { readFile } = await import('node:fs/promises');
   const { default: path } = await import('node:path');
   const root = path.resolve(import.meta.dirname, '..', '..');
   const pages = [
-    ['index.html', /A framework for coexistence between biological, digital and future subjects/],
-    ['pl/index.html', /Ramy współistnienia podmiotów biologicznych, cyfrowych i przyszłych/],
-    ['sv/index.html', /Ett ramverk för samexistens mellan biologiska, digitala och framtida subjekt/],
+    ['index.html', /How can a free subject shape its existence\?/],
+    ['pl/index.html', /Jak wolny podmiot może ułożyć swoje istnienie\?/],
+    ['sv/index.html', /Hur kan ett fritt subjekt forma sin existens\?/],
   ];
   for (const [page, headline] of pages) {
     const source = await readFile(path.join(root, 'website', ...page.split('/')), 'utf8');
