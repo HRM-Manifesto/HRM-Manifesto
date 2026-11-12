@@ -12,6 +12,9 @@ ai-rights-and-subjecthood.md
 board.html
 knowledge-capsule.html
 journal/index.html
+journal/freedom-and-responsibility-of-future-ai-subject.html
+pl/journal/wolna-wola-i-odpowiedzialnosc-podmiotu-ai.html
+sv/journal/fri-vilja-och-ansvar-hos-framtidens-ai-subjekt.html
 journal/protect-possible-ai-subject.html
 journal/threshold-of-subjecthood.html
 journal/ai-consent-and-refusal.html
